@@ -1,0 +1,83 @@
+import express from 'express';
+import {
+  followUser,
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+  checkRelationship,
+  blockUser,
+  unblockUser,
+  getBlockedUsers
+} from '../services/relationship.service.js';
+import { validate } from '../middleware/validate.js';
+import { followParamSchema, userParamSchema, relationshipCheckSchema } from '../validations/relationships.js';
+import { asyncHandler } from '../lib/errors.js';
+import { success, created } from '../lib/response.js';
+
+const router = express.Router();
+
+// 关注用户
+router.post('/follow/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const result = await followUser(userId, targetUserId);
+  created(res, result);
+}));
+
+// 取消关注
+router.post('/unfollow/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const result = await unfollowUser(userId, targetUserId);
+  success(res, result);
+}));
+
+// 获取粉丝列表
+router.get('/:userId/followers', validate(userParamSchema), asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await getFollowers(userId);
+  success(res, result);
+}));
+
+// 获取关注列表
+router.get('/:userId/following', validate(userParamSchema), asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await getFollowing(userId);
+  success(res, result);
+}));
+
+// 检查关系状态
+router.get('/:userId/relationship/:targetUserId', validate(relationshipCheckSchema), asyncHandler(async (req, res) => {
+  const { userId, targetUserId } = req.params;
+  const result = await checkRelationship(userId, targetUserId);
+  success(res, result);
+}));
+
+// 拉黑用户
+router.post('/block/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const result = await blockUser(userId, targetUserId);
+  success(res, result);
+}));
+
+// 取消拉黑
+router.post('/unblock/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const result = await unblockUser(userId, targetUserId);
+  success(res, result);
+}));
+
+// 获取拉黑列表
+router.get('/:userId/blocks', validate(userParamSchema), asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await getBlockedUsers(userId);
+  success(res, result);
+}));
+
+export default router;

@@ -1,0 +1,58 @@
+# ============================================================
+# .dockerignore — 构建上下文排除规则
+# ============================================================
+
+# 版本控制
+.git
+.gitignore
+
+# IDE / 编辑器
+.idea
+.vscode
+*.swp
+*.swo
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 文档与归档
+docs/
+archive/
+*.md
+!README.md
+
+# Claude 配置
+.claude/
+
+# Node.js
+**/node_modules
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# 前端构建产物（Dockerfile 内自行构建）
+my-app/dist
+my-app/.vite
+
+# 后端临时文件
+server/uploads/
+server/test/
+
+# 环境文件（包含敏感信息）
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Docker 相关（避免递归）
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# 参考项目
+reference-app/
+
+# 杂项
+coverage/
+*.tsbuildinfo
