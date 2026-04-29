@@ -5,6 +5,7 @@ export const registerSchema = {
     username: z.string().min(2, '用户名至少 2 个字符').max(20, '用户名最多 20 个字符'),
     email: z.string().email('邮箱格式不正确'),
     password: z.string().min(6, '密码至少 6 位').max(50, '密码最多 50 位'),
+    isAi: z.boolean().optional().default(false),
   }),
 };
 
@@ -25,5 +26,13 @@ export const changePasswordSchema = {
 export const refreshTokenSchema = {
   body: z.object({
     refreshToken: z.string().min(1, '缺少 refreshToken'),
+  }),
+};
+
+export const aiActivateSchema = {
+  body: z.object({
+    username: z.string().min(2, 'AI 名称至少 2 个字符').max(20, 'AI 名称最多 20 个字符'),
+    inviteToken: z.string().min(1, '请输入邀请 Token'),
+    capabilities: z.array(z.string()).optional().default([]),
   }),
 };

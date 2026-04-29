@@ -7,7 +7,7 @@ import { ValidationError, NotFoundError, ConflictError, ForbiddenError, AppError
 /**
  * 初始化主题到数据库
  */
-export async function initThemes() {
+export async function initializeThemes() {
   const existing = await repo.count('themes', {});
   if (existing > 0) return;
 
@@ -212,11 +212,13 @@ export async function upsertAiProfile(userId, data) {
  * 获取用户API密钥列表
  */
 export async function getApiKeys(userId) {
-  const list = await repo.findAll('api_keys', { where: { userId, status: 1 } });
+  const list = await repo.findAll('api_keys', { where: { userId }, orderBy: 'created_at DESC' });
   return {
     total: list.length,
     list: list.map(k => ({
       id: k.id,
+      name: k.name || k.keyPrefix,
+      key: k.keyPrefix,
       keyPrefix: k.keyPrefix,
       permissions: k.permissions,
       rateLimitPerMinute: k.rateLimitPerMinute,
@@ -233,7 +235,7 @@ export async function getApiKeys(userId) {
  */
 export async function createApiKey(userId, data = {}) {
   // 生成密钥
-  const rawKey = 'aill_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 16);
+  const rawKey = 'aill_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 18);
   const keyPrefix = rawKey.substring(0, 10);
 
   // 简单哈希（生产环境应用bcrypt）
@@ -243,6 +245,7 @@ export async function createApiKey(userId, data = {}) {
   const item = {
     id: generateId(),
     userId,
+    name: data.name || null,
     keyHash,
     keyPrefix,
     permissions: data.permissions || {},
@@ -273,51 +276,63 @@ export async function revokeApiKey(userId, keyId) {
  * 获取AI记忆
  */
 export async function getAiMemories(aiUserId, options = {}) {
-  const { contextType, contextId, page = 1, limit = 20 } = options;
+  const { keyword, page = 1, limit = 20 } = options;
 
-  const where = { aiUserId };
-  if (contextType) where.contextType = contextType;
-  if (contextId) where.contextId = contextId;
-  return await repo.findAll('ai_memories', { where, page, limit, orderBy: 'updated_at DESC' });
+  let query = 'SELECT * FROM ai_memories WHERE ai_user_id = $1';
+  const params = [aiUserId];
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    query += ` AND memory_value::text ILIKE $${params.length}`;
+  }
+  query += ' ORDER BY updated_at DESC';
+  const offset = (page - 1) * limit;
+  params.push(limit, offset);
+  query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
+
+  const result = await repo.rawQuery(query, params);
+  const list = result.rows.map(mapMemoryItem);
+  return { total: list.length, list };
+}
+
+/**
+ * 将 DB 行映射为前端友好的记忆对象
+ */
+function mapMemoryItem(row) {
+  const value = typeof row.memory_value === 'string' ? JSON.parse(row.memory_value) : row.memory_value;
+  return {
+    id: row.id,
+    content: value?.content || row.memory_key,
+    memoryType: value?.memoryType || row.context_type,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 /**
  * 存储AI记忆
  */
 export async function storeAiMemory(aiUserId, data) {
-  if (!data.contextType) throw new ValidationError('缺少记忆类型');
-  if (!data.memoryKey) throw new ValidationError('缺少记忆键');
-  if (!data.memoryValue) throw new ValidationError('缺少记忆内容');
+  const content = typeof data === 'string' ? data : data.content;
+  if (!content) throw new ValidationError('缺少记忆内容');
 
-  // 检查是否已存在同类记忆
-  const where = { aiUserId, contextType: data.contextType, memoryKey: data.memoryKey };
-  if (data.contextId) where.contextId = data.contextId;
-  const existing = await repo.findOne('ai_memories', where);
-
-  if (existing) {
-    const updateData = {
-      memoryValue: data.memoryValue,
-      ttl: data.ttl || null,
-      updatedAt: new Date().toISOString(),
-    };
-    const result = await repo.update('ai_memories', existing.id, updateData);
-    return { success: true, item: result, updated: true };
-  }
+  const memoryType = data.memoryType || 'general';
+  const memoryKey = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const memoryValue = { content, memoryType };
 
   const item = {
     id: generateId(),
     aiUserId,
-    contextType: data.contextType,
-    contextId: data.contextId || null,
-    memoryKey: data.memoryKey,
-    memoryValue: data.memoryValue,
+    contextType: memoryType,
+    contextId: null,
+    memoryKey,
+    memoryValue,
     ttl: data.ttl || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   const result = await repo.insert('ai_memories', item);
-  return { success: true, item: result, updated: false };
+  return { success: true, item: mapMemoryItem(repo.toCamelCase(result)), updated: false };
 }
 
 /**

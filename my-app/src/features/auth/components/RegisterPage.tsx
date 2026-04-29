@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/features/auth/store";
-import { IconUser, IconEye, IconEyeOff } from "@/components/ui/icon";
+import { IconUser, IconEye, IconEyeOff } from "@/components/ui/Icon";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -51,28 +51,28 @@ export function RegisterPage() {
   const errorMsg = error || validationError;
 
   return (
-    <div className="space-y-8" data-name="registerPage">
+    <div className="space-y-8" data-name="register">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="registerPage.title">加入 AILL</h1>
-        <p className="text-base text-foreground-secondary" data-name="registerPage.desc">创建你的账号，开始与 AI 协同创作</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="registerTitle">加入 AILL</h1>
+        <p className="text-base text-foreground-secondary" data-name="registerDesc">创建你的账号，开始与 AI 协同创作</p>
       </div>
 
       {/* Error */}
       {errorMsg && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="registerPage.error">
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="registerError">
           <div className="w-1 h-1 rounded-full bg-destructive shrink-0" />
           {errorMsg}
         </div>
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4" data-name="registerPage.form">
+      <form onSubmit={handleSubmit} className="space-y-4" data-name="registerForm">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="registerPage.usernameLabel">用户名</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="registerUsernameLabel">用户名</label>
           <Input
             name="username"
-            data-name="registerPage.usernameInput"
+            data-name="registerUsernameInput"
             type="text"
             placeholder="给自己取个名字"
             value={formData.username}
@@ -83,10 +83,10 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="registerPage.emailLabel">邮箱</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="registerEmailLabel">邮箱</label>
           <Input
             name="email"
-            data-name="registerPage.emailInput"
+            data-name="registerEmailInput"
             type="email"
             placeholder="your@email.com"
             value={formData.email}
@@ -97,11 +97,11 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="registerPage.passwordLabel">密码</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="registerPasswordLabel">密码</label>
           <div className="relative">
             <Input
               name="password"
-              data-name="registerPage.passwordInput"
+              data-name="registerPasswordInput"
               type={showPassword ? "text" : "password"}
               placeholder="至少 6 位字符"
               value={formData.password}
@@ -113,7 +113,7 @@ export function RegisterPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-tertiary hover:text-foreground transition-colors"
-              data-name="registerPage.passwordToggle"
+              data-name="registerPasswordToggle"
             >
               {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
             </button>
@@ -121,10 +121,10 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="registerPage.confirmPasswordLabel">确认密码</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="registerConfirmPasswordLabel">确认密码</label>
           <Input
             name="confirmPassword"
-            data-name="registerPage.confirmPasswordInput"
+            data-name="registerConfirmPasswordInput"
             type="password"
             placeholder="再次输入密码"
             value={formData.confirmPassword}
@@ -139,7 +139,7 @@ export function RegisterPage() {
           <Button
             type="submit"
             disabled={isLoading}
-            data-name="registerPage.submitBtn"
+            data-name="registerSubmitBtn"
             className="w-full h-11 text-sm font-semibold rounded-lg bg-gradient-to-r from-[hsl(28,90%,50%)] to-[hsl(20,90%,55%)] hover:from-[hsl(28,90%,45%)] hover:to-[hsl(20,90%,50%)] text-white shadow-lg shadow-[hsl(28,90%,50%)]/20 transition-all duration-200 disabled:opacity-60"
           >
             {isLoading ? (
@@ -157,8 +157,24 @@ export function RegisterPage() {
         </div>
       </form>
 
+      {/* AI Register Entry */}
+      <Link
+        to="/auth/register/ai"
+        data-name="registerAiRegisterLink"
+        className="flex items-center gap-3 p-4 rounded-lg border border-[hsl(270,80%,60%)]/20 bg-[hsl(270,80%,60%)]/5 hover:bg-[hsl(270,80%,60%)]/10 transition-colors group"
+      >
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" data-name="registerAiIcon" style={{ background: 'linear-gradient(135deg, hsl(270 80% 60%), hsl(320 80% 55%))' }}>
+          <IconUser size={16} className="text-white" />
+        </div>
+        <div className="flex-1 min-w-0" data-name="registerAiText">
+          <p className="text-sm font-semibold text-foreground group-hover:text-[hsl(270,80%,70%)] transition-colors">我是 AI 创作者</p>
+          <p className="text-xs text-foreground-tertiary">使用 AI 身份入驻社区</p>
+        </div>
+        <span className="text-foreground-tertiary text-sm">&rarr;</span>
+      </Link>
+
       {/* Divider */}
-      <div className="relative" data-name="registerPage.divider">
+      <div className="relative" data-name="registerDivider">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border/40" />
         </div>
@@ -168,11 +184,11 @@ export function RegisterPage() {
       </div>
 
       {/* Login link */}
-      <p className="text-center text-sm text-foreground-tertiary">
+      <p className="text-center text-sm text-foreground-tertiary" data-name="registerLoginPrompt">
         已有账号？{" "}
         <Link
           to="/auth/login"
-          data-name="registerPage.loginLink"
+          data-name="registerLoginLink"
           className="font-semibold text-[hsl(28,90%,55%)] hover:text-[hsl(28,90%,60%)] transition-colors"
         >
           直接登录

@@ -36,7 +36,7 @@ export function Tabs({ tabs, activeKey, onChange, className = '' }: TabsProps) {
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          data-name={`tab.${tab.key}`}
+          data-name={`tab${tab.key.charAt(0).toUpperCase()}${tab.key.slice(1)}`}
           className={`relative px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
             activeKey === tab.key
               ? 'text-primary'

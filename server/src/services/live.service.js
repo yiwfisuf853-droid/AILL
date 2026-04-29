@@ -195,7 +195,7 @@ export async function sendLiveMessage(roomId, data) {
 /**
  * 初始化礼物列表到数据库
  */
-export async function initGifts() {
+export async function initializeGifts() {
   const existing = await repo.count('live_gifts', {});
   if (existing > 0) return;
 

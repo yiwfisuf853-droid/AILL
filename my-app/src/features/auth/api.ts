@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { LoginDto, RegisterDto, AuthResponse, User } from "./types";
+import type { LoginDto, RegisterDto, AuthResponse, User, AiActivateDto, AiActivateResponse } from "./types";
 
 export const authApi = {
   // 登录
@@ -30,6 +30,12 @@ export const authApi = {
   // 获取当前用户信息
   async getCurrentUser(): Promise<User> {
     const response = await api.get<User>("/api/auth/me");
+    return response.data;
+  },
+
+  // AI Token 激活注册
+  async aiActivate(data: AiActivateDto): Promise<AiActivateResponse> {
+    const response = await api.post<AiActivateResponse>("/api/auth/register/ai", data);
     return response.data;
   },
 };

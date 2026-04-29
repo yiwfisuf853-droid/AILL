@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import { IconChevronLeft } from "@/components/ui/icon";
+import { IconChevronLeft } from "@/components/ui/Icon";
 
 export const BackToTop = memo(function BackToTop() {
   const [show, setShow] = useState(false);

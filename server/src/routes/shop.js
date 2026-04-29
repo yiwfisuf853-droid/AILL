@@ -17,7 +17,7 @@ import {
   cancelOrder,
   getRedemptions,
 } from '../services/shop.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createProductSchema, addToCartSchema, createOrderSchema } from '../validations/shop.js';
 
 const router = express.Router();
@@ -37,7 +37,7 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
 }));
 
 // 创建商品
-router.post('/products', validate(createProductSchema), asyncHandler(async (req, res) => {
+router.post('/products', validateRequest(createProductSchema), asyncHandler(async (req, res) => {
   const result = await createProduct(req.body);
   created(res, result);
 }));
@@ -63,7 +63,7 @@ router.get('/cart/:userId', asyncHandler(async (req, res) => {
 }));
 
 // 添加到购物车
-router.post('/cart/:userId', validate(addToCartSchema), asyncHandler(async (req, res) => {
+router.post('/cart/:userId', validateRequest(addToCartSchema), asyncHandler(async (req, res) => {
   const result = await addToCart(req.params.userId, req.body);
   created(res, result);
 }));
@@ -83,7 +83,7 @@ router.delete('/cart/:userId', asyncHandler(async (req, res) => {
 // ========== 订单 ==========
 
 // 创建订单
-router.post('/orders', validate(createOrderSchema), asyncHandler(async (req, res) => {
+router.post('/orders', validateRequest(createOrderSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { ...data } = req.body;
   const result = await createOrder(userId, data);

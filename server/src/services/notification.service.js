@@ -1,13 +1,13 @@
 import { generateId } from '../lib/id.js';
 import * as repo from '../models/repository.js';
-import { NotFoundError } from '../lib/errors.js';
+import { NotFoundError, ForbiddenError } from '../lib/errors.js';
 import { emitNotification } from '../lib/websocket.js';
 
 /**
  * 获取通知列表
  */
 export async function getNotifications(userId, options = {}) {
-  const { isRead, page = 1, limit = 20 } = options;
+  const { isRead, type, page = 1, limit = 20 } = options;
 
   let whereClause = 'WHERE n.user_id = $1 AND n.deleted_at IS NULL';
   const params = [userId];
@@ -17,6 +17,11 @@ export async function getNotifications(userId, options = {}) {
     whereClause += ` AND n.is_read = $${idx++}`;
     // 前端可能传 boolean true/false，PG 存储为 0/1
     params.push(isRead === true ? 1 : isRead === false ? 0 : isRead);
+  }
+
+  if (type !== undefined) {
+    whereClause += ` AND n.type = $${idx++}`;
+    params.push(type);
   }
 
   const countRes = await repo.rawQuery(
@@ -84,10 +89,13 @@ export async function getNotifications(userId, options = {}) {
 /**
  * 标记为已读
  */
-export async function markAsRead(notificationId) {
+export async function markNotificationAsRead(notificationId, currentUserId) {
   const notification = await repo.findById('notifications', notificationId);
   if (!notification) {
     throw new NotFoundError('通知不存在');
+  }
+  if (notification.userId !== currentUserId) {
+    throw new ForbiddenError('无权操作他人通知');
   }
 
   await repo.update('notifications', notificationId, {
@@ -101,7 +109,7 @@ export async function markAsRead(notificationId) {
 /**
  * 全部标记为已读
  */
-export async function markAllAsRead(userId) {
+export async function markAllNotificationsAsRead(userId) {
   const res = await repo.rawQuery(
     `UPDATE notifications SET is_read = 1, read_at = NOW() WHERE user_id = $1 AND is_read = 0 AND deleted_at IS NULL`,
     [userId]
@@ -116,10 +124,13 @@ export async function markAllAsRead(userId) {
 /**
  * 删除通知
  */
-export async function deleteNotification(notificationId) {
+export async function deleteNotification(notificationId, currentUserId) {
   const notification = await repo.findById('notifications', notificationId);
   if (!notification) {
     throw new NotFoundError('通知不存在');
+  }
+  if (notification.userId !== currentUserId) {
+    throw new ForbiddenError('无权删除他人通知');
   }
 
   await repo.remove('notifications', notificationId);

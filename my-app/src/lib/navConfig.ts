@@ -1,7 +1,7 @@
 import {
   IconHome, IconDiscover, IconTrophy, IconBookOpen,
-  IconShop, IconLive, IconCampaign, IconAI
-} from "@/components/ui/icon";
+  IconShop, IconLive, IconCampaign, IconAI, IconBookmark
+} from "@/components/ui/Icon";
 
 export const NAV_LINKS = [
   { href: "/", label: "首页", icon: IconHome, module: "home" },
@@ -12,6 +12,7 @@ export const NAV_LINKS = [
   { href: "/live", label: "直播", icon: IconLive, module: "live" },
   { href: "/campaigns", label: "活动", icon: IconCampaign, module: "campaigns" },
   { href: "/ai", label: "AI", icon: IconAI, module: "ai" },
+  { href: "/subscriptions", label: "订阅", icon: IconBookmark, module: "subscriptions" },
 ] as const;
 
 export const MODULE_HSL: Record<string, string> = {
@@ -23,6 +24,7 @@ export const MODULE_HSL: Record<string, string> = {
   live: "0 80% 55%",
   campaigns: "28 90% 56%",
   ai: "262 83% 68%",
+  subscriptions: "220 70% 55%",
 };
 
 export const SECTIONS = [
@@ -32,6 +34,54 @@ export const SECTIONS = [
   { id: "life", name: "生活", icon: "☕", color: "28 90% 56%", desc: "生活点滴记录", hot: "美食探店", bg: "from-amber-500/15 to-amber-500/5 border-amber-500/20" },
   { id: "ai", name: "AI 创作", icon: "🤖", color: "262 83% 68%", desc: "AI 作品展示", hot: "AI绘画", bg: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/20" },
 ];
+
+// 侧边栏个人区可配置项
+export const SIDEBAR_PERSONAL_ITEMS = [
+  { id: "notifications", label: "通知", icon: "IconNotification" },
+  { id: "messages", label: "私信", icon: "IconMail" },
+  { id: "favorites", label: "收藏", icon: "IconHeart" },
+  { id: "profile", label: "我的", icon: "IconUser" },
+  { id: "settings", label: "设置", icon: "IconSettings" },
+] as const;
+
+// 侧边栏配置类型
+export interface SidebarConfig {
+  sections: { id: string; visible: boolean }[];
+  personal: { id: string; visible: boolean }[];
+}
+
+// 默认侧边栏配置
+export const DEFAULT_SIDEBAR_CONFIG: SidebarConfig = {
+  sections: SECTIONS.map((s) => ({ id: s.id, visible: true })),
+  personal: SIDEBAR_PERSONAL_ITEMS.map((p) => ({ id: p.id, visible: true })),
+};
+
+// 从 localStorage 读取侧边栏配置
+export function getSidebarConfig(): SidebarConfig {
+  try {
+    const saved = localStorage.getItem('sidebarConfig');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // 合并默认值，防止新增项缺失
+      return {
+        sections: DEFAULT_SIDEBAR_CONFIG.sections.map((def) => {
+          const found = parsed.sections?.find((s: { id: string }) => s.id === def.id);
+          return found ?? def;
+        }),
+        personal: DEFAULT_SIDEBAR_CONFIG.personal.map((def) => {
+          const found = parsed.personal?.find((p: { id: string }) => p.id === def.id);
+          return found ?? def;
+        }),
+      };
+    }
+  } catch {}
+  return DEFAULT_SIDEBAR_CONFIG;
+}
+
+// 保存侧边栏配置到 localStorage
+export function saveSidebarConfig(config: SidebarConfig): void {
+  localStorage.setItem('sidebarConfig', JSON.stringify(config));
+}
 
 export const SECTION_MAP: Record<string, { name: string; hsl: string }> = Object.fromEntries(
   SECTIONS.map(s => [s.id, { name: s.name, hsl: s.color }])

@@ -21,11 +21,12 @@ export interface NotificationListResponse {
 }
 
 export const notificationApi = {
-  async getNotifications(userId: string, params: { page?: number; limit?: number; isRead?: boolean } = {}): Promise<NotificationListResponse> {
+  async getNotifications(userId: string, params: { page?: number; limit?: number; isRead?: boolean; type?: number } = {}): Promise<NotificationListResponse> {
     const query = new URLSearchParams();
     if (params.page) query.append('page', params.page.toString());
     if (params.limit) query.append('limit', params.limit.toString());
     if (params.isRead !== undefined) query.append('isRead', params.isRead.toString());
+    if (params.type !== undefined) query.append('type', params.type.toString());
     const res = await api.get(`/api/notifications/${userId}?${query}`);
     return res.data;
   },

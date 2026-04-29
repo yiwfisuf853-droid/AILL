@@ -7,9 +7,9 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen flex bg-background">
+    <div data-name="authLayout" className="min-h-screen flex bg-background">
       {/* Left Panel - Branding (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] relative overflow-hidden shrink-0">
+      <div data-name="authBrandPanel" className="hidden lg:flex lg:w-[480px] xl:w-[540px] relative overflow-hidden shrink-0">
         {/* Gradient base */}
         <div className="absolute inset-0 bg-gradient-to-br from-[hsl(28,90%,8%)] via-[hsl(230,20%,6%)] to-[hsl(210,100%,6%)]" />
 
@@ -77,9 +77,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex flex-col">
+      <div data-name="authFormPanel" className="flex-1 flex flex-col">
         {/* Mobile header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-border/40">
+        <div data-name="authMobileHeader" className="lg:hidden flex items-center justify-between p-4 border-b border-border/40">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(28,90%,50%)]/15">
               <span className="text-sm font-black text-[hsl(28,90%,60%)]">A</span>
@@ -92,7 +92,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         {/* Form container */}
-        <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
+        <div data-name="authFormContainer" className="flex-1 flex items-center justify-center p-6 sm:p-10">
           <div className="w-full max-w-[400px]">
             {children}
           </div>

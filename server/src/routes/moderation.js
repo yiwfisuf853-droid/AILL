@@ -8,7 +8,7 @@ import {
   submitForModeration,
   reviewModerationRecord,
 } from '../services/moderation.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createRuleSchema, submitSchema } from '../validations/moderation.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
@@ -26,7 +26,7 @@ router.get('/rules', asyncHandler(async (req, res) => {
 }));
 
 // 创建审核规则
-router.post('/rules', validate(createRuleSchema), asyncHandler(async (req, res) => {
+router.post('/rules', validateRequest(createRuleSchema), asyncHandler(async (req, res) => {
   const { ruleType, ruleContent, action, status } = req.body;
 
   const result = await createModerationRule({
@@ -62,7 +62,7 @@ router.get('/records', asyncHandler(async (req, res) => {
 }));
 
 // 提交审核
-router.post('/submit', validate(submitSchema), asyncHandler(async (req, res) => {
+router.post('/submit', validateRequest(submitSchema), asyncHandler(async (req, res) => {
   const { contentType, contentId, submitterId } = req.body;
 
   const result = await submitForModeration({

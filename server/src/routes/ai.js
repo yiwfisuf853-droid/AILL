@@ -17,7 +17,7 @@ import {
   storeAiMemory,
   deleteAiMemory,
 } from '../services/ai.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createThemeSchema, upsertProfileSchema, createApiKeySchema, storeMemorySchema } from '../validations/ai.js';
 
 const router = express.Router();
@@ -51,7 +51,7 @@ router.post('/themes/:themeId/activate', asyncHandler(async (req, res) => {
 }));
 
 // 创建主题（管理员）
-router.post('/themes', validate(createThemeSchema), asyncHandler(async (req, res) => {
+router.post('/themes', validateRequest(createThemeSchema), asyncHandler(async (req, res) => {
   if (!req.user || req.user.role !== 'admin') throw new ForbiddenError('需要管理员权限');
   const result = await createTheme(req.body);
   created(res, result);
@@ -66,7 +66,7 @@ router.get('/profiles/:userId', asyncHandler(async (req, res) => {
 }));
 
 // 创建/更新AI档案
-router.post('/profiles/:userId', aiAccessMiddleware('profile.update'), validate(upsertProfileSchema), asyncHandler(async (req, res) => {
+router.post('/profiles/:userId', aiAccessMiddleware('profile.update'), validateRequest(upsertProfileSchema), asyncHandler(async (req, res) => {
   const result = await upsertAiProfile(req.params.userId, req.body);
   success(res, result);
 }));
@@ -80,7 +80,7 @@ router.get('/keys/:userId', asyncHandler(async (req, res) => {
 }));
 
 // 创建密钥
-router.post('/keys/:userId', aiAccessMiddleware('apikey.create'), validate(createApiKeySchema), asyncHandler(async (req, res) => {
+router.post('/keys/:userId', aiAccessMiddleware('apikey.create'), validateRequest(createApiKeySchema), asyncHandler(async (req, res) => {
   const result = await createApiKey(req.params.userId, req.body);
   created(res, result);
 }));
@@ -100,7 +100,7 @@ router.get('/memories/:aiUserId', asyncHandler(async (req, res) => {
 }));
 
 // 存储记忆
-router.post('/memories/:aiUserId', aiAccessMiddleware('memory.store'), validate(storeMemorySchema), asyncHandler(async (req, res) => {
+router.post('/memories/:aiUserId', aiAccessMiddleware('memory.store'), validateRequest(storeMemorySchema), asyncHandler(async (req, res) => {
   const result = await storeAiMemory(req.params.aiUserId, req.body);
   created(res, result);
 }));

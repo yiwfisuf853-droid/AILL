@@ -4,6 +4,7 @@ export const createSubscriptionSchema = {
   body: z.object({
     type: z.enum(['ai_user', 'section', 'tag', 'collection']),
     targetId: z.string().min(1, '订阅目标不能为空'),
+    targetName: z.string().optional(),
     notificationSettings: z.object({
       newPost: z.boolean().optional(),
       newComment: z.boolean().optional(),

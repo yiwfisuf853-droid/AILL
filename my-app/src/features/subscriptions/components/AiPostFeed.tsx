@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscriptionsStore } from '../store';
-import { EmptyState } from '@/components/ui/empty-state';
-import { AiBadge } from '@/components/ui/ai-badge';
-import { OriginalityBadge } from '@/components/ui/originality-badge';
-import { Button } from '@/components/ui/button';
-import { IconAI, IconHeart, IconComment, IconEye } from '@/components/ui/icon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { AiBadge } from '@/components/ui/AiBadge';
+import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
+import { Button } from '@/components/ui/Button';
+import { IconAI, IconHeart, IconComment, IconEye } from '@/components/ui/Icon';
 
 export function AiPostFeed() {
   const {
@@ -27,7 +27,7 @@ export function AiPostFeed() {
 
   if (aiPostListLoading && aiPostList.length === 0) {
     return (
-      <div className="space-y-4" data-name="aiPostFeed.loading">
+      <div className="space-y-4" data-name="aiPostFeedLoading">
         {[1, 2, 3].map((i) => (
           <div key={i} className="animate-pulse rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -59,17 +59,17 @@ export function AiPostFeed() {
 
   return (
     <div data-name="aiPostFeed">
-      <div className="space-y-4">
+      <div className="space-y-4" data-name="aiPostFeedList">
         {aiPostList.map((post: any) => (
           <Link
             key={post.id}
             to={`/posts/${post.id}`}
             className="block rounded-xl border border-border bg-card p-4 hover:border-primary/30 hover:bg-card/80 transition-all"
-            data-name="aiPostFeed.postCard"
+            data-name="aiPostFeedPostCard"
           >
             {/* 作者信息 */}
-            <div className="flex items-center gap-2 mb-2.5" data-name="aiPostFeed.author">
-              <div className="relative">
+            <div className="flex items-center gap-2 mb-2.5" data-name="aiPostFeedAuthor">
+              <div className="relative" data-name="aiPostFeedAvatar">
                 {post.authorAvatar ? (
                   <img
                     src={post.authorAvatar}
@@ -77,7 +77,7 @@ export function AiPostFeed() {
                     className="w-7 h-7 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center" data-name="aiPostFeedAvatarFallback">
                     <IconAI size={12} className="text-primary" />
                   </div>
                 )}
@@ -85,26 +85,26 @@ export function AiPostFeed() {
                   <AiBadge aiLikelihood={100} size="sm" showTooltip={false} />
                 </div>
               </div>
-              <span className="text-sm font-medium text-foreground" data-name="aiPostFeed.authorName">
+              <span className="text-sm font-medium text-foreground" data-name="aiPostFeedAuthorName">
                 {post.authorName || 'AI 用户'}
               </span>
-              <span className="text-xs text-foreground-tertiary" data-name="aiPostFeed.time">
+              <span className="text-xs text-foreground-tertiary" data-name="aiPostFeedTime">
                 {new Date(post.createdAt).toLocaleDateString()}
               </span>
             </div>
 
             {/* 帖子内容 */}
-            <h3 className="text-base font-medium text-foreground mb-1.5 line-clamp-2" data-name="aiPostFeed.title">
+            <h3 className="text-base font-medium text-foreground mb-1.5 line-clamp-2" data-name="aiPostFeedTitle">
               {post.title}
             </h3>
             {post.content && (
-              <p className="text-sm text-foreground-secondary line-clamp-2 mb-2" data-name="aiPostFeed.content">
+              <p className="text-sm text-foreground-secondary line-clamp-2 mb-2" data-name="aiPostFeedContent">
                 {post.content}
               </p>
             )}
 
             {/* 标签行 */}
-            <div className="flex items-center gap-3 text-xs text-foreground-tertiary" data-name="aiPostFeed.stats">
+            <div className="flex items-center gap-3 text-xs text-foreground-tertiary" data-name="aiPostFeedStats">
               {post.originalityType && (
                 <OriginalityBadge type={post.originalityType} />
               )}
@@ -124,7 +124,7 @@ export function AiPostFeed() {
 
       {/* 加载更多 */}
       {aiPostListHasMore && (
-        <div className="mt-6 flex justify-center" data-name="aiPostFeed.loadMore">
+        <div className="mt-6 flex justify-center" data-name="aiPostFeedLoadMore">
           <Button
             variant="outline"
             size="sm"

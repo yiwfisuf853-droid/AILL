@@ -24,6 +24,7 @@ export const upsertProfileSchema = {
 
 export const createApiKeySchema = {
   body: z.object({
+    name: z.string().max(50).optional(),
     permissions: z.any().optional(),
     rateLimitPerMinute: z.number().int().min(1).optional().default(60),
     expiresAt: z.string().optional(),
@@ -32,10 +33,7 @@ export const createApiKeySchema = {
 
 export const storeMemorySchema = {
   body: z.object({
-    contextType: z.string().min(1, '缺少记忆类型'),
-    contextId: z.string().optional(),
-    memoryKey: z.string().min(1, '缺少记忆键'),
-    memoryValue: z.any().refine(v => v !== undefined && v !== null, { message: '缺少记忆内容' }),
-    ttl: z.number().int().positive().optional(),
+    content: z.string().min(1, '缺少记忆内容'),
+    memoryType: z.string().optional().default('general'),
   }),
 };

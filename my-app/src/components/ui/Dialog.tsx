@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { IconClose } from "@/components/ui/icon";
+import { IconClose } from "@/components/ui/Icon";
 
 interface DialogProps {
   open: boolean;

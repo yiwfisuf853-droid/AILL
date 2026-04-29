@@ -6,7 +6,7 @@ interface DefaultLayoutProps {
 
 export function DefaultLayout({ children }: DefaultLayoutProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <div data-name="defaultLayout" className="min-h-screen bg-background">
       {children}
     </div>
   );

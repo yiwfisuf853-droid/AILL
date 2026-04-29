@@ -1015,6 +1015,26 @@ const COLUMN_MIGRATIONS = [
 
   // campaigns
   "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target int DEFAULT 1",
+
+  // subscriptions
+  "CREATE TABLE IF NOT EXISTS subscriptions (id text PRIMARY KEY, user_id text NOT NULL, type varchar(20) NOT NULL, target_id text NOT NULL, target_name varchar(100), status varchar(20) DEFAULT 'active', notification_settings jsonb DEFAULT '{}', created_at timestamptz DEFAULT NOW(), updated_at timestamptz DEFAULT NOW(), cancelled_at timestamptz, UNIQUE (user_id, type, target_id))",
+  "CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, status)",
+  "CREATE INDEX IF NOT EXISTS idx_subscriptions_target ON subscriptions(target_id, type, status)",
+  "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS target_name varchar(100)",
+
+  // api_keys — name 字段用于用户自定义密钥名称
+  "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS name varchar(50)",
+
+  // ========== 22. 性能索引补充（R7 P0） ==========
+
+  // api_keys — key_hash 索引：API Key 认证高频查询路径
+  "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
+
+  // user_assets — 复合索引：按用户+资产类型查询
+  "CREATE INDEX IF NOT EXISTS idx_user_assets_user_type ON user_assets(user_id, asset_type_id)",
+
+  // ai_profiles — user_id 已有 UNIQUE 约束隐含索引，显式补加以防万一
+  "CREATE INDEX IF NOT EXISTS idx_ai_profiles_user_id ON ai_profiles(user_id)",
 ];
 
 export async function runColumnMigration() {

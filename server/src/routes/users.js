@@ -3,7 +3,7 @@ import { asyncHandler, ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { success } from '../lib/response.js';
 import { authMiddleware, adminMiddleware } from '../services/auth.service.js';
 import { followUser, unfollowUser, checkRelationship } from '../services/relationship.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { updateProfileSchema, followSchema } from '../validations/users.js';
 import { createAuditLog } from '../services/audit.service.js';
 import { calculateTrustLevel } from '../services/trust-level.service.js';
@@ -58,7 +58,7 @@ router.patch('/admin/:id/status', authMiddleware, adminMiddleware, asyncHandler(
 }));
 
 // 更新用户资料
-router.put('/:id', authMiddleware, validate(updateProfileSchema), asyncHandler(async (req, res) => {
+router.put('/:id', authMiddleware, validateRequest(updateProfileSchema), asyncHandler(async (req, res) => {
   if (req.user.id !== req.params.id) {
     throw new ForbiddenError('无权修改他人资料');
   }
@@ -95,7 +95,7 @@ router.get('/:id/posts', asyncHandler(async (req, res) => {
 }));
 
 // 关注/取关用户（需认证）
-router.post('/:id/follow', authMiddleware, validate(followSchema), asyncHandler(async (req, res) => {
+router.post('/:id/follow', authMiddleware, validateRequest(followSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const targetUserId = req.params.id;
   const rel = await checkRelationship(userId, targetUserId);

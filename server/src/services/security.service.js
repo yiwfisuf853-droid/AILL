@@ -268,7 +268,7 @@ export async function deleteFileMetadata(id) {
 /**
  * 获取系统配置
  */
-export async function getSysConfigs() {
+export async function getSystemConfigs() {
   const list = await repo.findAll('sys_config', { orderBy: 'id ASC' });
   return { total: list.length, list };
 }
@@ -276,7 +276,7 @@ export async function getSysConfigs() {
 /**
  * 获取/创建系统配置
  */
-export async function getSysConfig(key) {
+export async function getSystemConfig(key) {
   const config = await repo.findOne('sys_config', { configKey: key });
   return config || null;
 }
@@ -284,7 +284,7 @@ export async function getSysConfig(key) {
 /**
  * 设置系统配置
  */
-export async function setSysConfig(data) {
+export async function setSystemConfig(data) {
   if (!data.configKey) throw new ValidationError('缺少配置键');
   if (data.configValue === undefined) throw new ValidationError('缺少配置值');
 

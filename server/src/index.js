@@ -29,7 +29,7 @@ import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/upload.js';
 import auditRoutes from './routes/audit.js';
 import subscriptionRoutes from './routes/subscriptions.js';
-import { authMiddleware, adminMiddleware, optionalAuth } from './services/auth.service.js';
+import { authMiddleware, adminMiddleware, optionalAuthMiddleware } from './services/auth.service.js';
 import { AppError } from './lib/errors.js';
 import { initDatabase } from './data/init-db.js';
 import { initWebSocket } from './lib/websocket.js';
@@ -77,7 +77,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // 全局可选认证（设置 req.user 如果 token 存在）
-app.use(optionalAuth);
+app.use(optionalAuthMiddleware);
 
 // 请求日志
 app.use((req, res, next) => {

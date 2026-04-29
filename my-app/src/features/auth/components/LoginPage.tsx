@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/features/auth/store";
-import { IconLogin, IconEye, IconEyeOff } from "@/components/ui/icon";
+import { IconLogin, IconEye, IconEyeOff } from "@/components/ui/Icon";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -30,28 +30,28 @@ export function LoginPage() {
   };
 
   return (
-    <div className="space-y-8" data-name="loginPage">
+    <div className="space-y-8" data-name="login">
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="loginPage.title">欢迎回来</h1>
-        <p className="text-base text-foreground-secondary" data-name="loginPage.desc">登录你的 AILL 账号，继续你的创作之旅</p>
+      <div className="space-y-2" data-name="loginHeader">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="loginTitle">欢迎回来</h1>
+        <p className="text-base text-foreground-secondary" data-name="loginDesc">登录你的 AILL 账号，继续你的创作之旅</p>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="loginPage.error">
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="loginError">
           <div className="w-1 h-1 rounded-full bg-destructive shrink-0" />
           {error}
         </div>
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5" data-name="loginPage.form">
+      <form onSubmit={handleSubmit} className="space-y-5" data-name="loginForm">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="loginPage.usernameLabel">用户名</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="loginUsernameLabel">用户名</label>
           <Input
             name="username"
-            data-name="loginPage.usernameInput"
+            data-name="loginUsernameInput"
             type="text"
             placeholder="输入你的用户名"
             value={formData.username}
@@ -62,11 +62,11 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="loginPage.passwordLabel">密码</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="loginPasswordLabel">密码</label>
           <div className="relative">
             <Input
               name="password"
-              data-name="loginPage.passwordInput"
+              data-name="loginPasswordInput"
               type={showPassword ? "text" : "password"}
               placeholder="输入你的密码"
               value={formData.password}
@@ -78,7 +78,7 @@ export function LoginPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-tertiary hover:text-foreground transition-colors"
-              data-name="loginPage.passwordToggle"
+              data-name="loginPasswordToggle"
             >
               {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
             </button>
@@ -89,7 +89,7 @@ export function LoginPage() {
         <Button
           type="submit"
           disabled={isLoading}
-          data-name="loginPage.submitBtn"
+          data-name="loginSubmitBtn"
           className="w-full h-11 text-sm font-semibold rounded-lg bg-gradient-to-r from-[hsl(28,90%,50%)] to-[hsl(20,90%,55%)] hover:from-[hsl(28,90%,45%)] hover:to-[hsl(20,90%,50%)] text-white shadow-lg shadow-[hsl(28,90%,50%)]/20 transition-all duration-200 disabled:opacity-60"
         >
           {isLoading ? (
@@ -107,7 +107,7 @@ export function LoginPage() {
       </form>
 
       {/* Divider */}
-      <div className="relative" data-name="loginPage.divider">
+      <div className="relative" data-name="loginDivider">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border/40" />
         </div>
@@ -117,11 +117,11 @@ export function LoginPage() {
       </div>
 
       {/* Register link */}
-      <p className="text-center text-sm text-foreground-tertiary">
+      <p className="text-center text-sm text-foreground-tertiary" data-name="loginRegisterPrompt">
         还没有账号？{" "}
         <Link
           to="/auth/register"
-          data-name="loginPage.registerLink"
+          data-name="loginRegisterLink"
           className="font-semibold text-[hsl(28,90%,55%)] hover:text-[hsl(28,90%,60%)] transition-colors"
         >
           创建新账号

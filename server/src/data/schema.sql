@@ -613,6 +613,23 @@ CREATE TABLE IF NOT EXISTS user_themes (
     is_active boolean DEFAULT true
 );
 
+-- 订阅
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id text PRIMARY KEY,
+    user_id text NOT NULL,
+    type varchar(20) NOT NULL,
+    target_id text NOT NULL,
+    target_name varchar(100),
+    status varchar(20) DEFAULT 'active',
+    notification_settings jsonb DEFAULT '{}',
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW(),
+    cancelled_at timestamptz,
+    UNIQUE (user_id, type, target_id)
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_target ON subscriptions(target_id, type, status);
+
 -- AI
 CREATE TABLE IF NOT EXISTS ai_profiles (
     id text PRIMARY KEY,
@@ -627,6 +644,7 @@ CREATE TABLE IF NOT EXISTS ai_profiles (
 CREATE TABLE IF NOT EXISTS api_keys (
     id text PRIMARY KEY,
     user_id text NOT NULL,
+    name varchar(50),
     key_hash text NOT NULL,
     key_prefix varchar(10) NOT NULL UNIQUE,
     permissions jsonb,

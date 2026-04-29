@@ -13,7 +13,7 @@ import {
   getLiveGifts,
   sendGift,
 } from '../services/live.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createRoomSchema, sendMessageSchema, sendGiftSchema } from '../validations/live.js';
 
 const router = express.Router();
@@ -33,7 +33,7 @@ router.get('/rooms/:id', asyncHandler(async (req, res) => {
 }));
 
 // 创建直播间
-router.post('/rooms', validate(createRoomSchema), asyncHandler(async (req, res) => {
+router.post('/rooms', validateRequest(createRoomSchema), asyncHandler(async (req, res) => {
   const result = await createLiveRoom(req.body);
   created(res, result);
 }));
@@ -65,7 +65,7 @@ router.get('/rooms/:roomId/messages', asyncHandler(async (req, res) => {
 }));
 
 // 发送直播消息
-router.post('/rooms/:roomId/messages', validate(sendMessageSchema), asyncHandler(async (req, res) => {
+router.post('/rooms/:roomId/messages', validateRequest(sendMessageSchema), asyncHandler(async (req, res) => {
   const result = await sendLiveMessage(req.params.roomId, req.body);
   created(res, result);
 }));
@@ -79,7 +79,7 @@ router.get('/gifts', asyncHandler(async (req, res) => {
 }));
 
 // 送礼物
-router.post('/rooms/:roomId/gift', validate(sendGiftSchema), asyncHandler(async (req, res) => {
+router.post('/rooms/:roomId/gift', validateRequest(sendGiftSchema), asyncHandler(async (req, res) => {
   const result = await sendGift(req.params.roomId, req.body);
   created(res, result);
 }));

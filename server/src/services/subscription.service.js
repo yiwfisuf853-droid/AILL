@@ -9,7 +9,7 @@ import { createNotification } from './notification.service.js';
  * 创建订阅
  */
 export async function createSubscription(userId, subscriptionData) {
-  const { type, targetId, notificationSettings = {} } = subscriptionData;
+  const { type, targetId, targetName, notificationSettings = {} } = subscriptionData;
 
   // 检查是否已订阅
   const existing = await repo.findOne('subscriptions', {
@@ -28,8 +28,9 @@ export async function createSubscription(userId, subscriptionData) {
     userId,
     type,
     targetId,
+    targetName: subscriptionData.targetName,
     status: 'active',
-    notificationSettings: JSON.stringify(notificationSettings),
+    notificationSettings,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -66,7 +67,6 @@ export async function cancelSubscription(userId, subscriptionId) {
   await repo.update('subscriptions', subscriptionId, {
     status: 'cancelled',
     cancelledAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   });
 
   return { success: true };
@@ -76,7 +76,7 @@ export async function cancelSubscription(userId, subscriptionId) {
  * 获取用户的订阅列表
  */
 export async function getUserSubscriptions(userId, options = {}) {
-  const { type, page = 1, limit = 20, status = 'active' } = options;
+  const { type, page = 1, pageSize: limit = 20, status = 'active' } = options;
 
   const where = { userId };
   if (type) where.type = type;
@@ -115,8 +115,8 @@ export async function getUserSubscriptions(userId, options = {}) {
     total: result.total,
     list: enriched,
     page: result.page,
-    pageSize: result.pageSize,
-    hasMore: result.hasMore,
+    pageSize: limit,
+    hasMore: page * limit < result.total,
   };
 }
 
@@ -124,7 +124,7 @@ export async function getUserSubscriptions(userId, options = {}) {
  * 获取 AI 用户的订阅者列表
  */
 export async function getAiSubscribers(aiUserId, options = {}) {
-  const { page = 1, limit = 20 } = options;
+  const { page = 1, pageSize: limit = 20 } = options;
 
   const result = await repo.findAll('subscriptions', {
     where: {
@@ -176,8 +176,7 @@ export async function updateSubscriptionSettings(userId, subscriptionId, setting
   const newSettings = { ...currentSettings, ...settings };
 
   await repo.update('subscriptions', subscriptionId, {
-    notificationSettings: JSON.stringify(newSettings),
-    updatedAt: new Date().toISOString(),
+    notificationSettings: newSettings,
   });
 
   return { success: true };
@@ -187,7 +186,7 @@ export async function updateSubscriptionSettings(userId, subscriptionId, setting
  * 获取订阅的 AI 用户的新帖子流
  */
 export async function getSubscribedAiPosts(userId, options = {}) {
-  const { page = 1, limit = 20 } = options;
+  const { page = 1, pageSize: limit = 20 } = options;
 
   // 获取用户订阅的 AI 列表
   const subscriptions = await repo.findAll('subscriptions', {
@@ -205,18 +204,29 @@ export async function getSubscribedAiPosts(userId, options = {}) {
 
   const aiUserIds = subscriptions.list.map((s) => s.targetId);
 
-  // 获取这些 AI 的帖子
-  const posts = await repo.findAll('posts', {
-    where: {
-      authorId: aiUserIds,
-      status: 'published',
-    },
-    page,
-    limit,
-    orderBy: 'created_at DESC',
-  });
+  // 获取这些 AI 的帖子（使用 IN 查询）
+  const placeholders = aiUserIds.map((_, i) => `$${i + 1}`).join(',');
+  const countRes = await repo.rawQuery(
+    `SELECT COUNT(*) as total FROM posts WHERE author_id IN (${placeholders}) AND status = 'published'`,
+    aiUserIds
+  );
+  const total = Number(countRes.rows[0].total);
 
-  return posts;
+  const offset = (page - 1) * limit;
+  const postsRes = await repo.rawQuery(
+    `SELECT * FROM posts WHERE author_id IN (${placeholders}) AND status = 'published' ORDER BY created_at DESC LIMIT $${aiUserIds.length + 1} OFFSET $${aiUserIds.length + 2}`,
+    [...aiUserIds, limit, offset]
+  );
+
+  const list = postsRes.rows.map((row) => repo.toCamelCase(row, 'posts'));
+
+  return {
+    total,
+    list,
+    page,
+    pageSize: limit,
+    hasMore: page * limit < total,
+  };
 }
 
 // ========== 订阅通知 ==========
@@ -225,7 +235,7 @@ export async function getSubscribedAiPosts(userId, options = {}) {
  * 发送新帖子通知给订阅者
  */
 export async function notifySubscribersNewPost(aiUserId, postId) {
-  const subscribers = await getAiSubscribers(aiUserId, { limit: 1000 });
+  const subscribers = await getAiSubscribers(aiUserId, { pageSize: 1000 });
 
   // 通过 WebSocket 推送通知给所有订阅者
   for (const sub of subscribers.list) {

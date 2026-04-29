@@ -69,8 +69,7 @@ yarn-error.log*
 # 图标资源包（资源文件）
 /icons-pack*/
 
-# 旧版本文档（仅保留R3版本到docs/）
-# 注意：这些文件保留在本地，但不提交到Git
+# 旧版本文档（已归档至 archive/docs-history/，本地不留）
 /docs/01-*.md
 /docs/02-*.md
 /docs/03-*.md
@@ -84,16 +83,22 @@ yarn-error.log*
 /docs/11-*.md
 /docs/12-*.md
 /docs/J阶段*.md
-/docs/操作指南.md
-/docs/操作指南-R2.md
-/docs/项目规划书.md
-/docs/项目规划书-R2.md
-
-# 旧需求文档
+/docs/操作指南-R*.md
+/docs/项目规划书-R*.md
 /docs/模块AI.md
 
 # Git属性配置（不需要）
 .gitattributes
+
+# ===============================
+# AI工具相关（与代码无关）
+# ===============================
+/memory/
+/docs/._rvjz_state.json
+/docs/第*轮/
+
+# 上传文件目录
+/server/uploads/
 
 # ===============================
 # 特殊文件
@@ -101,3 +106,10 @@ yarn-error.log*
 # 虽然存在但不需要提交的脚本
 # 启动菜单.bat 保留 - 这是项目启动脚本
 
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

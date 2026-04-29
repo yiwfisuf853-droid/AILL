@@ -54,7 +54,7 @@ export interface CreateApiKeyDto {
 
 export interface StoreMemoryDto {
   content: string;
-  type?: number;
+  memoryType?: string;
 }
 
 export interface ThemeListQuery {
@@ -68,4 +68,5 @@ export interface MemoryListQuery {
   page?: number;
   pageSize?: number;
   type?: number;
+  keyword?: string;
 }

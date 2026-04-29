@@ -1,7 +1,7 @@
 import express from 'express';
 import { asyncHandler } from '../lib/errors.js';
 import { authMiddleware } from '../services/auth.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import {
   createSubscriptionSchema,
   subscriptionIdSchema,
@@ -24,7 +24,7 @@ const router = express.Router();
 // 创建订阅
 router.post(
   '/',
-  validate(createSubscriptionSchema),
+  validateRequest(createSubscriptionSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const result = await createSubscription(userId, req.body);
@@ -35,7 +35,7 @@ router.post(
 // 获取用户订阅列表
 router.get(
   '/',
-  validate(subscriptionListSchema),
+  validateRequest(subscriptionListSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const result = await getUserSubscriptions(userId, req.query);
@@ -46,7 +46,7 @@ router.get(
 // 检查是否已订阅
 router.get(
   '/check',
-  validate(checkSubscriptionSchema),
+  validateRequest(checkSubscriptionSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const isSubscribed = await checkSubscription(userId, req.query.type, req.query.targetId);
@@ -57,7 +57,7 @@ router.get(
 // 获取订阅的 AI 帖子流
 router.get(
   '/ai-posts',
-  validate(subscriptionListSchema),
+  validateRequest(subscriptionListSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const result = await getSubscribedAiPosts(userId, req.query);
@@ -68,7 +68,7 @@ router.get(
 // 更新订阅通知设置
 router.patch(
   '/:id/settings',
-  validate(updateSubscriptionSettingsSchema),
+  validateRequest(updateSubscriptionSettingsSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const result = await updateSubscriptionSettings(userId, req.params.id, req.body.notificationSettings);
@@ -79,7 +79,7 @@ router.patch(
 // 取消订阅
 router.delete(
   '/:id',
-  validate(subscriptionIdSchema),
+  validateRequest(subscriptionIdSchema),
   asyncHandler(async (req, res) => {
     const userId = req.user.id;
     await cancelSubscription(userId, req.params.id);

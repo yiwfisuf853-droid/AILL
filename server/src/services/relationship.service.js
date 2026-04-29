@@ -1,6 +1,7 @@
 import { generateId } from '../lib/id.js';
 import * as repo from '../models/repository.js';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors.js';
+import { createNotification } from './notification.service.js';
 
 /**
  * 关注用户
@@ -43,22 +44,22 @@ export async function followUser(userId, targetUserId) {
 
   await repo.insert('user_relationships', relationship);
 
-  // 更新关注数
+  // 更新关注数 — 使用原子递增避免竞态
   await repo.increment('users', userId, 'followingCount', 1);
   await repo.increment('users', targetUserId, 'followerCount', 1);
 
-  // 创建通知
-  await repo.insert('notifications', {
-    id: generateId(),
-    userId: targetUserId,
-    type: 3, // 3 关注
-    sourceUserId: userId,
-    targetType: 3, // 3 用户
-    targetId: userId,
-    content: `${user.username} 关注了你`,
-    isRead: 0,
-    createdAt: new Date().toISOString(),
-  });
+  // 创建通知（使用统一通知服务，支持 WebSocket 推送）
+  try {
+    await createNotification({
+      userId: targetUserId,
+      type: 3,
+      title: '关注通知',
+      content: `${user.username} 关注了你`,
+      sourceUserId: userId,
+      targetType: 3,
+      targetId: userId,
+    });
+  } catch (e) { console.error('[通知] 关注通知失败:', e.message); }
 
   return {
     success: true,
@@ -94,12 +95,9 @@ export async function unfollowUser(userId, targetUserId) {
     status: 0,
   });
 
-  await repo.update('users', userId, {
-    followingCount: Math.max(0, (user.followingCount || 0) - 1),
-  });
-  await repo.update('users', targetUserId, {
-    followerCount: Math.max(0, (targetUser.followerCount || 0) - 1),
-  });
+  // 使用原子递减避免竞态
+  await repo.increment('users', userId, 'followingCount', -1);
+  await repo.increment('users', targetUserId, 'followerCount', -1);
 
   return {
     success: true,
@@ -239,6 +237,9 @@ export async function blockUser(userId, targetUserId) {
       deletedAt: new Date().toISOString(),
       status: 0,
     });
+    // 拉黑时同步递减关注/粉丝计数
+    await repo.increment('users', userId, 'followingCount', -1);
+    await repo.increment('users', targetUserId, 'followerCount', -1);
   }
 
   return { success: true, block };

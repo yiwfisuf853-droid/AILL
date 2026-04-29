@@ -1,4 +1,4 @@
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/Toast";
 
 export function useNotDeveloped() {
   return (name?: string) => {

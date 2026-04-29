@@ -4,20 +4,21 @@ import { AppLayout } from "@/app/layouts/AppLayout";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { GuestRoute } from "@/components/auth/GuestRoute";
-import { PageSkeleton } from "@/components/ui/skeleton";
-import { Toaster } from "@/components/ui/toast";
-import { toast } from "@/components/ui/toast";
-import { Button } from "@/components/ui/button";
-import { IconHome } from "@/components/ui/icon";
+import { PageSkeleton } from "@/components/ui/Skeleton";
+import { Toaster } from "@/components/ui/Toast";
+import { toast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { IconHome } from "@/components/ui/Icon";
 import { useAuthStore } from "@/features/auth/store";
-import { useSocket } from "@/lib/useSocket";
-import { useOnlineUsers } from "@/lib/useOnlineUsers";
+import { useSocket } from "@/hooks/useSocket";
+import { useOnlineUsers } from "@/hooks/onlineUsersStore";
 import { useNotificationStore } from "@/features/notifications/store";
 
 // 懒加载页面组件 - 代码分割优化
 const HomePage = lazy(() => import("@/features/home/components/HomePage").then(m => ({ default: m.HomePage })));
 const LoginPage = lazy(() => import("@/features/auth/components/LoginPage").then(m => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import("@/features/auth/components/RegisterPage").then(m => ({ default: m.RegisterPage })));
+const AiRegisterPage = lazy(() => import("@/features/auth/components/AiRegisterPage").then(m => ({ default: m.AiRegisterPage })));
 const PostListPage = lazy(() => import("@/features/posts/components/PostListPage").then(m => ({ default: m.PostListPage })));
 const PostDetailPage = lazy(() => import("@/features/posts/components/PostDetailPage").then(m => ({ default: m.PostDetailPage })));
 const CreatePostPage = lazy(() => import("@/features/posts/components/CreatePostPage").then(m => ({ default: m.CreatePostPage })));
@@ -39,6 +40,7 @@ const EditPostPage = lazy(() => import("@/features/posts/components/EditPostPage
 const MessagesPage = lazy(() => import("@/features/messages/components/MessagesPage").then(m => ({ default: m.MessagesPage })));
 const FeedbackPage = lazy(() => import("@/features/feedback/components/FeedbackPage").then(m => ({ default: m.FeedbackPage })));
 const SubscriptionsPage = lazy(() => import("@/features/subscriptions/components/SubscriptionsPage").then(m => ({ default: m.SubscriptionsPage })));
+const SearchPage = lazy(() => import("@/features/search/components/SearchPage").then(m => ({ default: m.SearchPage })));
 
 function PageLoading() {
   return (
@@ -129,6 +131,7 @@ export function AppRouter() {
             <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
             <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
             <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
+            <Route path="/search" element={<SearchPage />} />
           </Route>
 
           {/* Routes without sidebar layout */}
@@ -144,11 +147,15 @@ export function AppRouter() {
             element={<GuestRoute><AuthLayout><RegisterPage /></AuthLayout></GuestRoute>}
           />
           <Route
+            path="/auth/register/ai"
+            element={<GuestRoute><AuthLayout><AiRegisterPage /></AuthLayout></GuestRoute>}
+          />
+          <Route
             path="*"
             element={
               <div className="min-h-screen flex items-center justify-center text-foreground bg-background">
                 <div className="text-center space-y-4">
-                  <h1 className="text-8xl font-bold text-gradient-brand">404</h1>
+                  <h1 className="text-8xl font-bold textGradientBrand">404</h1>
                   <p className="text-foreground-secondary text-lg">页面不存在</p>
                   <Link to="/">
                     <Button className="gap-2 bg-primary hover:bg-primary-hover">

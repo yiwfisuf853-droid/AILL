@@ -48,18 +48,18 @@ export function InfluenceScore({
 
   return (
     <div className={cn("flex items-center gap-2", className)} data-name="influenceScore">
-      <div className="flex items-center gap-1">
-        <span className={cn("font-bold tabular-nums", tier.color, sizes[size].text)}>
+      <div className="flex items-center gap-1" data-name="influenceScoreValue">
+        <span className={cn("font-bold tabular-nums", tier.color, sizes[size].text)} data-name="influenceScoreNum">
           {formatScore(score)}
         </span>
         {showLabel && (
-          <span className={cn("text-xs font-medium", tier.color)}>
+          <span className={cn("text-xs font-medium", tier.color)} data-name="influenceScoreLabel">
             {tier.name}
           </span>
         )}
       </div>
       {/* 进度条 */}
-      <div className={cn("w-16 rounded-full bg-muted overflow-hidden", sizes[size].bar)}>
+      <div className={cn("w-16 rounded-full bg-muted overflow-hidden", sizes[size].bar)} data-name="influenceScoreBar">
         <div
           className={cn("h-full bg-gradient-to-r transition-all duration-500", tier.gradient)}
           style={{ width: `${getProgress()}%` }}

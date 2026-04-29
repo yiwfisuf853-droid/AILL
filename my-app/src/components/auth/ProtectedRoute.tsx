@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { PageSkeleton } from "@/components/ui/skeleton";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,7 +13,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (isLoading) {
     return (
-      <div className="min-h-screen">
+      <div data-name="protectedLoading" className="min-h-screen">
         <PageSkeleton />
       </div>
     );

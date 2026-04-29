@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateId } from '../lib/id.js';
 import * as repo from '../models/repository.js';
 import { ConflictError, NotFoundError, ForbiddenError, UnauthorizedError, ValidationError } from '../lib/errors.js';
+import { validateApiKey } from '../middleware/apikey-auth.js';
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET 环境变量未设置，服务拒绝启动。请在 .env 中配置 JWT_SECRET。');
@@ -10,9 +11,17 @@ if (!process.env.JWT_SECRET) {
 }
 export const JWT_SECRET = process.env.JWT_SECRET;
 
-// 用户验证中间件
+// 用户验证中间件（支持 JWT + API Key）
 export const authMiddleware = async (req, res, next) => {
   try {
+    // 优先检查 X-API-Key header
+    const xApiKey = req.headers['x-api-key'];
+    if (xApiKey) {
+      const user = await validateApiKey(xApiKey);
+      if (user) { req.user = user; return next(); }
+      throw new UnauthorizedError('API Key 无效或已过期');
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedError('未授权，请先登录');
@@ -20,7 +29,14 @@ export const authMiddleware = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    // 检查 revoked_tokens 表
+    // API Key 通过 Bearer Token 方式传递（aill_ 前缀）
+    if (token.startsWith('aill_')) {
+      const user = await validateApiKey(token);
+      if (user) { req.user = user; return next(); }
+      throw new UnauthorizedError('API Key 无效或已过期');
+    }
+
+    // JWT 验证
     const revoked = await repo.findOne('revoked_tokens', { token });
     if (revoked) {
       throw new UnauthorizedError('Token 已失效，请重新登录');
@@ -35,12 +51,27 @@ export const authMiddleware = async (req, res, next) => {
   }
 };
 
-// 可选认证中间件（有 token 则设置 req.user，无 token 也不阻止）
-export const optionalAuth = (req, res, next) => {
+// 可选认证中间件（支持 JWT + API Key，无认证也不阻止）
+export const optionalAuthMiddleware = async (req, res, next) => {
   try {
+    // 检查 X-API-Key
+    if (req.headers['x-api-key']?.startsWith('aill_')) {
+      const user = await validateApiKey(req.headers['x-api-key']);
+      if (user) { req.user = user; return next(); }
+    }
+
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
+
+      // API Key
+      if (token.startsWith('aill_')) {
+        const user = await validateApiKey(token);
+        if (user) { req.user = user; return next(); }
+        return next();
+      }
+
+      // JWT
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = decoded;
     }
@@ -59,7 +90,7 @@ export const adminMiddleware = (req, res, next) => {
 };
 
 // 注册
-export async function register(username, email, password) {
+export async function registerUser(username, email, password, isAi = false) {
   // 检查用户是否存在
   const existingUser = await repo.rawQuery(
     `SELECT id FROM users WHERE username = $1 OR email = $2`,
@@ -79,9 +110,9 @@ export async function register(username, email, password) {
     email,
     password: hashedPassword,
     avatar: null,
-    bio: '',
-    isAi: false,
-    aiLikelihood: 0,
+    bio: isAi ? '我是一个 AI 创作者' : '',
+    isAi,
+    aiLikelihood: isAi ? 1.0 : 0,
     role: 'user',
     followerCount: 0,
     followingCount: 0,
@@ -104,7 +135,7 @@ export async function register(username, email, password) {
 }
 
 // 登录
-export async function login(username, password) {
+export async function loginUser(username, password) {
   const res = await repo.rawQuery(
     `SELECT * FROM users WHERE username = $1 OR email = $1`,
     [username]
@@ -167,7 +198,7 @@ function sanitizeUser(user) {
 }
 
 // 刷新 Token
-export async function refreshToken(refreshToken) {
+export async function refreshUserToken(refreshToken) {
   try {
     const decoded = jwt.verify(refreshToken, JWT_SECRET);
     if (decoded.type !== 'refresh') {
@@ -189,7 +220,7 @@ export async function refreshToken(refreshToken) {
 }
 
 // 更新用户资料
-export async function updateProfile(userId, updates) {
+export async function updateUserProfile(userId, updates) {
   const user = await repo.findById('users', userId);
   if (!user) throw new NotFoundError('用户不存在');
 
@@ -207,7 +238,7 @@ export async function updateProfile(userId, updates) {
 }
 
 // 修改密码
-export async function changePassword(userId, oldPassword, newPassword) {
+export async function changeUserPassword(userId, oldPassword, newPassword) {
   const user = await repo.findById('users', userId);
   if (!user) throw new NotFoundError('用户不存在');
 

@@ -12,7 +12,7 @@ import {
 } from '../services/collection.service.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createCollectionSchema, collectionIdSchema, addPostSchema } from '../validations/collections.js';
 
 const router = express.Router();
@@ -30,26 +30,26 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // 创建合集
-router.post('/', validate(createCollectionSchema), asyncHandler(async (req, res) => {
+router.post('/', validateRequest(createCollectionSchema), asyncHandler(async (req, res) => {
   const data = { ...req.body, userId: req.user.id };
   const result = await createCollection(data);
   created(res, result);
 }));
 
 // 更新合集
-router.patch('/:id', validate(collectionIdSchema), asyncHandler(async (req, res) => {
+router.patch('/:id', validateRequest(collectionIdSchema), asyncHandler(async (req, res) => {
   const result = await updateCollection(req.params.id, req.body);
   success(res, result);
 }));
 
 // 删除合集
-router.delete('/:id', validate(collectionIdSchema), asyncHandler(async (req, res) => {
+router.delete('/:id', validateRequest(collectionIdSchema), asyncHandler(async (req, res) => {
   await deleteCollection(req.params.id);
   deleted(res);
 }));
 
 // 添加帖子到合集
-router.post('/:id/posts', validate(addPostSchema), asyncHandler(async (req, res) => {
+router.post('/:id/posts', validateRequest(addPostSchema), asyncHandler(async (req, res) => {
   const result = await addPostToCollection(req.params.id, req.body);
   created(res, result);
 }));

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { IconAI } from "./icon";
+import { IconAI } from "./Icon";
 
 interface AiBadgeProps {
   aiLikelihood?: number;

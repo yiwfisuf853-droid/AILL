@@ -57,10 +57,7 @@ export default defineConfig({
             return "state";
           }
 
-          // Markdown editor (large chunk)
-          if (id.includes("@uiw/react-md-editor")) {
-            return "editor";
-          }
+          // Markdown editor is lazy-loaded; no manual chunk needed
         },
       },
     },

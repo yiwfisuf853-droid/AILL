@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { IconHeart, IconComment, IconMore, IconFlag, IconDelete } from '@/components/ui/icon';
-import { Avatar } from '@/components/ui/avatar';
-import { AiBadge } from '@/components/ui/ai-badge';
+import { IconHeart, IconComment, IconMore, IconFlag, IconDelete, IconChevronDown, IconChevronUp } from '@/components/ui/Icon';
+import { Avatar } from '@/components/ui/Avatar';
 import type { Comment } from '../types';
-import { Button } from '@/components/ui/button';
-import { MarkdownPreview } from '@/components/ui/markdown-editor';
+import { Button } from '@/components/ui/Button';
+import { MarkdownPreview } from '@/components/ui/MarkdownEditor';
 import { CommentEditor } from './CommentEditor';
 import { cn } from '@/lib/utils';
+import { commentApi } from '../api';
+import { ListSkeleton } from '@/components/ui/Skeleton';
 
 interface CommentItemProps {
   comment: Comment;
   postId: string;
+  depth?: number;
   onReply?: (comment: Comment) => void;
   onLike?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -21,6 +23,7 @@ interface CommentItemProps {
 export function CommentItem({
   comment,
   postId,
+  depth = 0,
   onReply,
   onLike,
   onDelete,
@@ -28,6 +31,10 @@ export function CommentItem({
 }: CommentItemProps) {
   const [showReplyEditor, setShowReplyEditor] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [replies, setReplies] = useState<Comment[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [repliesExpanded, setRepliesExpanded] = useState(false);
+  const [repliesTotal, setRepliesTotal] = useState(comment.replyCount || 0);
 
   const handleReply = () => {
     setShowReplyEditor(!showReplyEditor);
@@ -38,15 +45,42 @@ export function CommentItem({
 
   const handleSuccess = () => {
     setShowReplyEditor(false);
+    // 如果子评论已展开，重新加载；否则更新计数
+    if (repliesExpanded) {
+      loadReplies();
+    } else {
+      setRepliesTotal(prev => prev + 1);
+    }
   };
 
+  const loadReplies = async () => {
+    if (repliesLoading) return;
+    setRepliesLoading(true);
+    try {
+      const res = await commentApi.getCommentReplies(comment.id);
+      setReplies(res.list);
+      setRepliesTotal(res.total);
+    } catch {} finally {
+      setRepliesLoading(false);
+    }
+  };
+
+  const toggleReplies = () => {
+    if (!repliesExpanded && replies.length === 0) {
+      loadReplies();
+    }
+    setRepliesExpanded(!repliesExpanded);
+  };
+
+  // 最多嵌套3层
+  const canNest = depth < 2;
+
   return (
-    <div className={cn('py-4 border-b last:border-b-0')} data-name={`commentItem.${comment.id}`}>
-      {/* 评论头部：作者信息 */}
-      <div className="flex items-start gap-3">
+    <div className={cn('py-4', depth === 0 ? 'border-b last:border-b-0' : '')} data-name={`commentItem${comment.id}`}>
+      <div data-name={`commentItem${comment.id}Row`} className="flex items-start gap-3">
         <Link to={`/users/${comment.authorId}`}>
           <Avatar
-            size="sm"
+            size={depth > 0 ? 'xs' : 'sm'}
             src={comment.authorAvatar}
             fallback={comment.authorName}
             isAi={comment.authorIsAi}
@@ -55,48 +89,47 @@ export function CommentItem({
           />
         </Link>
 
-        <div className="flex-1 min-w-0">
+        <div data-name={`commentItem${comment.id}Body`} className="flex-1 min-w-0">
           {/* 作者名和时间 */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link to={`/users/${comment.authorId}`} className="font-medium text-sm hover:underline flex items-center gap-1" data-name={`commentItem.${comment.id}.authorName`}>
+          <div data-name={`commentItem${comment.id}Meta`} className="flex items-center gap-2 flex-wrap">
+            <Link to={`/users/${comment.authorId}`} className="font-medium text-sm hover:underline flex items-center gap-1" data-name={`commentItem${comment.id}AuthorName`}>
               {comment.authorName}
-              {comment.authorIsAi && <AiBadge aiLikelihood={comment.authorAiLikelihood} size="sm" />}
             </Link>
             {comment.isAuthor && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary" data-name={`commentItem.${comment.id}.authorBadge`}>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary" data-name={`commentItem${comment.id}AuthorBadge`}>
                 作者
               </span>
             )}
             {comment.isEssence && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-600" data-name={`commentItem.${comment.id}.essenceBadge`}>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-600" data-name={`commentItem${comment.id}EssenceBadge`}>
                 精华
               </span>
             )}
             {comment.isTop && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600" data-name={`commentItem.${comment.id}.topBadge`}>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600" data-name={`commentItem${comment.id}TopBadge`}>
                 置顶
               </span>
             )}
-            <span className="text-xs text-muted-foreground" data-name={`commentItem.${comment.id}.date`}>
+            <span className="text-xs text-muted-foreground" data-name={`commentItem${comment.id}Date`}>
               {new Date(comment.createdAt).toLocaleString('zh-CN')}
             </span>
           </div>
 
           {/* 回复目标 */}
           {comment.replyToUsername && (
-            <p className="text-xs text-muted-foreground mt-1" data-name={`commentItem.${comment.id}.replyTarget`}>
+            <p className="text-xs text-muted-foreground mt-1" data-name={`commentItem${comment.id}ReplyTarget`}>
               回复 <Link to={`/users/${comment.replyToUserId}`} className="hover:underline">@{comment.replyToUsername}</Link>
             </p>
           )}
 
           {/* 评论内容 */}
-          <div className="text-sm mt-2 break-words" data-name={`commentItem.${comment.id}.content`}>
+          <div className={cn('text-sm mt-2 break-words', depth > 0 && 'text-[0.82rem]')} data-name={`commentItem${comment.id}Content`}>
             <MarkdownPreview content={comment.content} />
           </div>
 
           {/* 评论图片 */}
           {comment.images && comment.images.length > 0 && (
-            <div className="flex gap-2 mt-2 flex-wrap" data-name={`commentItem.${comment.id}.images`}>
+            <div className="flex gap-2 mt-2 flex-wrap" data-name={`commentItem${comment.id}Images`}>
               {comment.images.map((img, idx) => (
                 <img
                   key={idx}
@@ -109,31 +142,46 @@ export function CommentItem({
           )}
 
           {/* 评论操作栏 */}
-          <div className="flex items-center gap-4 mt-3" data-name={`commentItem.${comment.id}.actions`}>
+          <div className="flex items-center gap-4 mt-3" data-name={`commentItem${comment.id}Actions`}>
             <button
               onClick={() => onLike?.(comment.id)}
               className={cn(
                 "flex items-center gap-1 text-xs transition-colors",
                 comment.isLiked ? "text-red-400 hover:text-red-500" : "text-muted-foreground hover:text-primary"
               )}
-              data-name={`commentItem.${comment.id}.likeBtn`}
+              data-name={`commentItem${comment.id}LikeBtn`}
             >
               <IconHeart size={14} className={comment.isLiked ? "fill-red-400" : undefined} />
               {comment.likeCount}
             </button>
 
-            <button
-              onClick={handleReply}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-              data-name={`commentItem.${comment.id}.replyBtn`}
-            >
-              <IconComment size={14} />
-              回复
-            </button>
+            {canNest && (
+              <button
+                onClick={handleReply}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                data-name={`commentItem${comment.id}ReplyBtn`}
+              >
+                <IconComment size={14} />
+                回复
+              </button>
+            )}
+
+            {/* 查看 N 条回复 */}
+            {repliesTotal > 0 && depth === 0 && (
+              <button
+                onClick={toggleReplies}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors"
+                data-name={`commentItem${comment.id}ToggleRepliesBtn`}
+              >
+                {repliesExpanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                {repliesExpanded ? '收起回复' : `查看 ${repliesTotal} 条回复`}
+              </button>
+            )}
 
             {/* 更多操作 */}
-            <div className="relative">
+            <div data-name={`commentItem${comment.id}MoreMenu`} className="relative">
               <button
+                data-name={`commentItem${comment.id}MoreBtn`}
                 onClick={() => setShowMenu(!showMenu)}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -141,8 +189,9 @@ export function CommentItem({
               </button>
 
               {showMenu && (
-                <div className="absolute left-0 top-full mt-1 bg-popover border rounded-md shadow-lg z-10 min-w-[120px]">
+                <div data-name={`commentItem${comment.id}Dropdown`} className="absolute left-0 top-full mt-1 bg-popover border rounded-md shadow-lg z-10 min-w-[120px]">
                   <Button
+                    data-name={`commentItem${comment.id}ReportBtn`}
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-xs"
@@ -155,6 +204,7 @@ export function CommentItem({
                     举报
                   </Button>
                   <Button
+                    data-name={`commentItem${comment.id}DeleteBtn`}
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-xs text-destructive hover:text-destructive"
@@ -172,8 +222,8 @@ export function CommentItem({
           </div>
 
           {/* 回复编辑器 */}
-          {showReplyEditor && (
-            <div className="mt-3 pl-3 border-l-2 border-primary/30">
+          {showReplyEditor && canNest && (
+            <div data-name={`commentItem${comment.id}ReplyEditor`} className="mt-3 pl-3 border-l-2 border-primary/30">
               <CommentEditor
                 postId={postId}
                 parentId={comment.id}
@@ -182,6 +232,28 @@ export function CommentItem({
                 onSuccess={handleSuccess}
                 onCancel={() => setShowReplyEditor(false)}
               />
+            </div>
+          )}
+
+          {/* 子评论列表 */}
+          {repliesExpanded && depth === 0 && (
+            <div className="mt-3 pl-4 border-l-2 border-border/50 space-y-0" data-name={`commentItem${comment.id}Replies`}>
+              {repliesLoading ? (
+                <ListSkeleton rows={2} />
+              ) : (
+                replies.map(reply => (
+                  <CommentItem
+                    key={reply.id}
+                    comment={reply}
+                    postId={postId}
+                    depth={depth + 1}
+                    onReply={onReply}
+                    onLike={onLike}
+                    onDelete={onDelete}
+                    onReport={onReport}
+                  />
+                ))
+              )}
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { IconChevronLeft, IconChevronRight } from "@/components/ui/icon";
+import { IconChevronLeft, IconChevronRight } from "@/components/ui/Icon";
 
 interface PaginationProps {
   page: number;
@@ -42,7 +42,7 @@ export function Pagination({ page, pageSize, total, onChange, className = '' }: 
           <button
             key={p}
             onClick={() => onChange(p)}
-            data-name={`paginationPage.${p}`}
+            data-name={`paginationPage${p}`}
             className={`min-w-[32px] h-8 rounded text-sm font-medium transition-colors ${
               page === p
                 ? 'bg-primary text-primary-foreground'

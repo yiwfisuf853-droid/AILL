@@ -1,9 +1,9 @@
 import { generateId } from '../lib/id.js';
 import bcrypt from 'bcryptjs';
-import { initThemes } from '../services/ai.service.js';
-import { initGifts } from '../services/live.service.js';
+import { initializeThemes } from '../services/ai.service.js';
+import { initializeGifts } from '../services/live.service.js';
 import * as repo from '../models/repository.js';
-import { initPg } from '../models/repository.js';
+import { initializePgConnection } from '../models/repository.js';
 import { runColumnMigration } from './migrate.js';
 import { calculateRankings } from '../services/ranking.service.js';
 
@@ -12,7 +12,7 @@ export async function initDatabase() {
   console.log('Initializing database...');
 
   // 连接 PG，失败则抛错
-  const pgReady = await initPg();
+  const pgReady = await initializePgConnection();
   if (!pgReady) {
     throw new Error('PostgreSQL connection failed. Cannot start server without database.');
   }
@@ -22,8 +22,8 @@ export async function initDatabase() {
   await seedPg();
 
   // 初始化主题和礼物种子数据
-  await initThemes();
-  await initGifts();
+  await initializeThemes();
+  await initializeGifts();
 
   console.log('Database initialized successfully!');
 }
@@ -46,6 +46,7 @@ async function seedPg() {
     'live_messages', 'live_rooms', 'live_gifts',
     'collection_tags', 'collection_posts', 'collections',
     'favorites', 'favorite_folders',
+    'subscriptions',
     'notifications',
     'messages', 'conversation_participants', 'conversations',
     'asset_transactions', 'user_assets', 'asset_types', 'user_contributions',

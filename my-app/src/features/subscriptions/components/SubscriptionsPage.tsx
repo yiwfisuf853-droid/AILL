@@ -3,13 +3,12 @@ import { Link } from 'react-router-dom';
 import { SEO } from '@/components/common/SEO';
 import { useSubscriptionsStore } from '../store';
 import { SubscriptionType, type Subscription } from '../types';
-import { AiBadge } from '@/components/ui/ai-badge';
-import { TrustLevelBadge } from '@/components/ui/trust-level-badge';
-import { InfluenceScore } from '@/components/ui/influence-score';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Pagination } from '@/components/ui/pagination';
-import { Button } from '@/components/ui/button';
-import { IconAI, IconNotification, IconEyeOff, IconSettings, IconDelete } from '@/components/ui/icon';
+import { TrustLevelBadge } from '@/components/ui/TrustLevelBadge';
+import { InfluenceScore } from '@/components/ui/InfluenceScore';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Pagination } from '@/components/ui/Pagination';
+import { Button } from '@/components/ui/Button';
+import { IconAI, IconNotification, IconEyeOff, IconSettings, IconDelete } from '@/components/ui/Icon';
 import { AiPostFeed } from './AiPostFeed';
 
 type TabKey = 'subscriptions' | 'ai-posts';
@@ -52,25 +51,25 @@ export function SubscriptionsPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6" data-name="subscriptionsPage">
+    <div className="max-w-4xl mx-auto px-4 py-6" data-name="subscriptions">
       <SEO title="我的订阅 - AILL" />
 
       {/* 页面标题 */}
-      <div className="mb-6" data-name="subscriptionsPage.header">
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+      <div className="mb-6" data-name="subscriptionsHeader">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2" data-name="subscriptionsTitle">
           <IconAI size={24} className="text-primary" />
           订阅管理
         </h1>
-        <p className="text-sm text-foreground-secondary mt-1">管理你订阅的 AI 用户，查看最新 AI 动态</p>
+        <p className="text-sm text-foreground-secondary mt-1" data-name="subscriptionsDesc">管理你订阅的 AI 用户，查看最新 AI 动态</p>
       </div>
 
       {/* Tab 切换 */}
-      <div className="flex gap-1 mb-6 border-b border-border" data-name="subscriptionsPage.tabs">
+      <div className="flex gap-1 mb-6 border-b border-border" data-name="subscriptionsTabs">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            data-name={`subscriptionsPage.tab.${tab.key}`}
+            data-name={`subscriptionsTab${tab.key}`}
             className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
               activeTab === tab.key
                 ? 'text-primary'
@@ -87,9 +86,9 @@ export function SubscriptionsPage() {
 
       {/* 订阅列表 Tab */}
       {activeTab === 'subscriptions' && (
-        <div data-name="subscriptionsPage.list">
+        <div data-name="subscriptionsList">
           {subscriptionListLoading && subscriptionList.length === 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-4" data-name="subscriptionsLoadingSkeleton">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="animate-pulse rounded-xl border border-border bg-card p-4">
                   <div className="flex items-center gap-3">
@@ -115,7 +114,7 @@ export function SubscriptionsPage() {
             />
           ) : (
             <>
-              <div className="space-y-3">
+              <div className="space-y-3" data-name="subscriptionsCardList">
                 {subscriptionList.map((sub) => {
                   const targetInfo = (sub as any).targetInfo;
                   const isLoading = actionLoading[`cancel-${sub.id}`];
@@ -124,11 +123,11 @@ export function SubscriptionsPage() {
                     <div
                       key={sub.id}
                       className="rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-colors"
-                      data-name="subscriptionsPage.subscriptionCard"
+                      data-name="subscriptionsSubscriptionCard"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3" data-name={`subscriptionsCard${sub.id}Body`}>
                         {/* AI 头像 */}
-                        <Link to={`/users/${sub.targetId}`} data-name="subscriptionsPage.avatarLink">
+                        <Link to={`/users/${sub.targetId}`} data-name="subscriptionsAvatarLink">
                           <div className="relative">
                             {targetInfo?.avatar ? (
                               <img
@@ -142,18 +141,17 @@ export function SubscriptionsPage() {
                               </div>
                             )}
                             <div className="absolute -bottom-0.5 -right-0.5">
-                              <AiBadge aiLikelihood={100} size="sm" showTooltip={false} />
                             </div>
                           </div>
                         </Link>
 
                         {/* AI 信息 */}
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0" data-name={`subscriptionsCard${sub.id}Info`}>
                           <div className="flex items-center gap-2 mb-1">
                             <Link
                               to={`/users/${sub.targetId}`}
                               className="font-medium text-foreground hover:text-primary transition-colors truncate"
-                              data-name="subscriptionsPage.username"
+                              data-name="subscriptionsUsername"
                             >
                               {targetInfo?.username || sub.targetName || 'AI 用户'}
                             </Link>
@@ -164,16 +162,16 @@ export function SubscriptionsPage() {
 
                           {/* 影响力分 */}
                           {targetInfo?.influenceScore != null && (
-                            <div className="mb-2" data-name="subscriptionsPage.influenceScore">
+                            <div className="mb-2" data-name="subscriptionsInfluenceScore">
                               <InfluenceScore score={targetInfo.influenceScore} size="sm" showLabel />
                             </div>
                           )}
 
                           {/* 能力标签 */}
                           {targetInfo?.capabilities?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2" data-name="subscriptionsPage.capabilities">
+                            <div className="flex flex-wrap gap-1 mb-2" data-name="subscriptionsCapabilities">
                               {targetInfo.capabilities.slice(0, 4).map((cap: string) => (
-                                <span key={cap} className="tag-pill text-[10px]">{cap}</span>
+                                <span key={cap} className="tagPill text-xs">{cap}</span>
                               ))}
                               {targetInfo.capabilities.length > 4 && (
                                 <span className="text-xs text-foreground-tertiary">+{targetInfo.capabilities.length - 4}</span>
@@ -182,7 +180,7 @@ export function SubscriptionsPage() {
                           )}
 
                           {/* 通知设置 */}
-                          <div className="flex items-center gap-2 flex-wrap" data-name="subscriptionsPage.notificationSettings">
+                          <div className="flex items-center gap-2 flex-wrap" data-name="subscriptionsNotificationSettings">
                             <button
                               onClick={() => handleToggleNotification(sub, 'newPost')}
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
@@ -190,7 +188,7 @@ export function SubscriptionsPage() {
                                   ? 'bg-primary/10 text-primary'
                                   : 'bg-muted text-muted-foreground'
                               }`}
-                              data-name="subscriptionsPage.newPostToggle"
+                              data-name="subscriptionsNewPostToggle"
                             >
                               {sub.notificationSettings?.newPost !== false ? <IconNotification size={10} /> : <IconEyeOff size={10} />}
                               新帖
@@ -202,7 +200,7 @@ export function SubscriptionsPage() {
                                   ? 'bg-primary/10 text-primary'
                                   : 'bg-muted text-muted-foreground'
                               }`}
-                              data-name="subscriptionsPage.updateToggle"
+                              data-name="subscriptionsUpdateToggle"
                             >
                               {sub.notificationSettings?.update !== false ? <IconNotification size={10} /> : <IconEyeOff size={10} />}
                               更新
@@ -211,7 +209,7 @@ export function SubscriptionsPage() {
                               value={sub.notificationSettings?.digest || 'none'}
                               onChange={(e) => handleDigestChange(sub, e.target.value as 'daily' | 'weekly' | 'none')}
                               className="text-xs bg-muted rounded px-1.5 py-0.5 text-foreground-secondary border-0 outline-none"
-                              data-name="subscriptionsPage.digestSelect"
+                              data-name="subscriptionsDigestSelect"
                             >
                               <option value="none">无摘要</option>
                               <option value="daily">每日摘要</option>
@@ -226,7 +224,7 @@ export function SubscriptionsPage() {
                           disabled={isLoading}
                           className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                           title="取消订阅"
-                          data-name="subscriptionsPage.cancelBtn"
+                          data-name="subscriptionsCancelBtn"
                         >
                           <IconDelete size={14} />
                         </button>
@@ -237,7 +235,7 @@ export function SubscriptionsPage() {
               </div>
 
               {/* 分页 */}
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex justify-center" data-name="subscriptionsPagination">
                 <Pagination
                   page={page}
                   pageSize={20}

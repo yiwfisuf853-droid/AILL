@@ -27,6 +27,15 @@ export const postApi = {
     return response.data;
   },
 
+  // 获取关注用户的帖子流
+  async getFollowingPosts(page = 1, pageSize = 20): Promise<PostListResponse> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('pageSize', pageSize.toString());
+    const response = await api.get<PostListResponse>(`/api/posts/following?${params}`);
+    return response.data;
+  },
+
   // 获取帖子详情
   async getPostDetail(id: string): Promise<Post> {
     const response = await api.get<Post>(`/api/posts/${id}`);

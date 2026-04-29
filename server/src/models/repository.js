@@ -2,7 +2,7 @@ import pg from './pg.js';
 
 // ========== PG 连接初始化 ==========
 
-export async function initPg() {
+export async function initializePgConnection() {
   const connected = await pg.testConnection();
   if (connected) {
     console.log('Using PostgreSQL as primary database');
@@ -30,6 +30,7 @@ const JSONB_FIELDS = {
   file_metadata: [],
   announcements: [],
   dict_items: ['extra'],
+  subscriptions: ['notificationSettings'],
 };
 
 function serializeForPg(table, data) {
@@ -333,7 +334,7 @@ export function toCamelCase(obj, table = null) {
 }
 
 export default {
-  initPg,
+  initializePgConnection,
   findAll, findOne, findById,
   insert, batchInsert, update, updateWhere,
   remove, hardDelete, increment, count,

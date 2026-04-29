@@ -15,7 +15,7 @@ import {
   getUserAchievements,
   unlockAchievement,
 } from '../services/campaign.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createCampaignSchema } from '../validations/campaigns.js';
 
 const router = express.Router();
@@ -35,7 +35,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // 创建活动
-router.post('/', validate(createCampaignSchema), asyncHandler(async (req, res) => {
+router.post('/', validateRequest(createCampaignSchema), asyncHandler(async (req, res) => {
   const result = await createCampaign(req.body);
   created(res, result);
 }));

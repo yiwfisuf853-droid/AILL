@@ -35,7 +35,7 @@ export function DropdownMenu({ trigger, items, align = 'right' }: DropdownMenuPr
             <button
               key={item.key}
               onClick={() => { item.onClick(); setOpen(false); }}
-              data-name={`dropdownItem.${item.key}`}
+              data-name={`dropdownItem${item.key}`}
               className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors ${
                 item.danger
                   ? 'text-destructive hover:bg-destructive/10'

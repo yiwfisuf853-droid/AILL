@@ -12,7 +12,7 @@ import type {
   AuditLog,
   FeedbackItem,
 } from '../api';
-import { IconBookOpen, IconCampaign, IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconComment, IconDelete, IconEdit, IconFilter, IconGroup, IconHome, IconLock, IconPlus, IconSearch, IconSettings, IconShield, IconWarning } from "@/components/ui/icon";
+import { IconBookOpen, IconCampaign, IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconComment, IconDelete, IconEdit, IconFilter, IconGroup, IconHome, IconLock, IconPlus, IconSearch, IconSettings, IconShield, IconWarning } from "@/components/ui/Icon";
 
 // ==================== Sidebar ====================
 
@@ -39,33 +39,33 @@ const sidebarItems: { key: TabKey; label: string; icon: React.ElementType }[] = 
 function Sidebar({ activeTab, onTabChange, collapsed, onToggleCollapse }: SidebarProps) {
   return (
     <aside
-      data-name="adminDashboard.sidebar"
+      data-name="adminSidebar"
       className={`fixed left-0 top-0 h-full z-30 flex flex-col border-r border-white/5 transition-all duration-300 ${
         collapsed ? 'w-16' : 'w-56'
       }`}
       style={{ background: `linear-gradient(180deg, hsl(var(--admin-bg)) 0%, hsl(var(--admin-bg-deep)) 100%)` }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-white/5 shrink-0" data-name="adminDashboard.sidebarLogo">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-black text-sm shrink-0">
+      <div className="flex items-center gap-3 px-4 h-16 border-b border-white/5 shrink-0" data-name="adminSidebarLogo">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-black text-sm shrink-0" data-name="adminSidebarLogoIcon">
           A
         </div>
         {!collapsed && (
-          <span className="text-white font-bold text-sm tracking-wide whitespace-nowrap">
+          <span className="text-white font-bold text-sm tracking-wide whitespace-nowrap" data-name="adminSidebarLogoText">
             AILL Admin
           </span>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto" data-name="adminSidebarNav">
         {sidebarItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeTab === key;
           return (
             <button
               key={key}
               onClick={() => onTabChange(key)}
-              data-name={`adminDashboard.sidebarNav.${key}`}
+              data-name={`adminSidebarNav${key}`}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-gradient-to-r from-blue-600/20 to-cyan-500/10 text-cyan-300 shadow-inner'
@@ -80,7 +80,7 @@ function Sidebar({ activeTab, onTabChange, collapsed, onToggleCollapse }: Sideba
               />
               {!collapsed && <span className="whitespace-nowrap">{label}</span>}
               {isActive && !collapsed && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" data-name="adminSidebarNavActiveDot" />
               )}
             </button>
           );
@@ -88,10 +88,10 @@ function Sidebar({ activeTab, onTabChange, collapsed, onToggleCollapse }: Sideba
       </nav>
 
       {/* Collapse toggle */}
-      <div className="p-2 border-t border-white/5">
+      <div className="p-2 border-t border-white/5" data-name="adminSidebarCollapseWrap">
         <button
           onClick={onToggleCollapse}
-          data-name="adminDashboard.sidebarCollapseBtn"
+          data-name="adminSidebarCollapseBtn"
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors text-sm"
         >
           {collapsed ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
@@ -114,13 +114,14 @@ interface ModalProps {
 function Modal({ open, onClose, title, children }: ModalProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 p-6 shadow-2xl" style={{ backgroundColor: 'hsl(var(--admin-modal-bg))' }}>
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" data-name="adminModalOverlay">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} data-name="adminModalBackdrop" />
+      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 p-6 shadow-2xl" style={{ backgroundColor: 'hsl(var(--admin-modal-bg))' }} data-name="adminModalContent">
+        <div className="flex items-center justify-between mb-5" data-name="adminModalHeader">
           <h3 className="text-lg font-semibold text-white">{title}</h3>
           <button
             onClick={onClose}
+            data-name="adminModalCloseBtn"
             className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-colors"
           >
             <IconClose size={20} />
@@ -161,9 +162,9 @@ function OverviewTab() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold text-white" data-name="adminDashboard.overviewTitleLoading">数据概览</h2>
-        <div className="flex items-center justify-center py-20">
+      <div className="space-y-6" data-name="adminOverviewLoading">
+        <h2 className="text-xl font-bold text-white" data-name="adminOverviewTitleLoading">数据概览</h2>
+        <div className="flex items-center justify-center py-20" data-name="adminOverviewLoadingSpinner">
           <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
@@ -171,41 +172,43 @@ function OverviewTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-white" data-name="adminDashboard.overviewTitle">数据概览</h2>
+    <div className="space-y-6" data-name="adminOverviewTab">
+      <h2 className="text-xl font-bold text-white" data-name="adminOverviewTitle">数据概览</h2>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-name="adminStatCardGrid">
         {stats.map((s) => (
           <div
             key={s.label}
-            data-name={`adminDashboard.statCard.${s.label}`}
+            data-name={`adminStatCard${s.label}`}
             className="relative overflow-hidden rounded-xl border border-white/5 bg-white/[0.02] p-5"
           >
             <div
               className="absolute top-0 right-0 w-24 h-24 opacity-10 blur-2xl"
+              data-name="adminStatCardDecorBg"
               style={{
                 background: `linear-gradient(135deg, var(--tw-gradient-stops))`,
               }}
             />
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3" data-name="adminStatCardHeader">
               <div>
                 <span className="text-sm text-zinc-400">{s.label}</span>
                 {s.sub && <div className="text-[10px] text-zinc-600 mt-0.5">{s.sub}</div>}
               </div>
               <div
                 className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center`}
+                data-name={`adminStatCard${s.label}Icon`}
               >
                 <s.icon className="w-4 h-4 text-white" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-white">{s.value}</div>
+            <div className="text-2xl font-bold text-white" data-name={`adminStatCard${s.label}Value`}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* 近7天发帖趋势 */}
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-6" data-name="adminDashboard.weeklyChart">
+      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-6" data-name="adminWeeklyChart">
         <h3 className="text-sm font-medium text-zinc-400 mb-4">发帖趋势 (近7天)</h3>
         <WeeklyChart />
       </div>
@@ -230,16 +233,17 @@ function WeeklyChart() {
   const max = Math.max(...trends.map(t => t.posts), 1);
 
   return (
-    <div className="h-48 flex items-end gap-3">
+    <div className="h-48 flex items-end gap-3" data-name="adminWeeklyChartBars">
       {trends.length > 0 ? trends.map((t, i) => {
         const d = new Date(t.date);
         const label = dayLabels[d.getDay()];
         const pct = (t.posts / max) * 100;
         return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-2">
+          <div key={i} className="flex-1 flex flex-col items-center gap-2" data-name={`adminWeeklyChartBar${i}`}>
             <span className="text-[10px] text-zinc-500">{t.posts}</span>
             <div
               className="w-full rounded-t-md bg-gradient-to-t from-blue-600/60 to-cyan-400/80 transition-all"
+              data-name={`adminWeeklyChartBar${i}Fill`}
               style={{ height: `${Math.max(pct, 4)}%` }}
             />
             <span className="text-[10px] text-zinc-600">{label}</span>
@@ -248,9 +252,9 @@ function WeeklyChart() {
       }) : (
         // 无数据时的空占位
         Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-2">
+          <div key={i} className="flex-1 flex flex-col items-center gap-2" data-name={`adminWeeklyChartBarEmpty${i}`}>
             <span className="text-[10px] text-zinc-600">0</span>
-            <div className="w-full rounded-t-md bg-white/5" style={{ height: '4%' }} />
+            <div className="w-full rounded-t-md bg-white/5" style={{ height: '4%' }} data-name={`adminWeeklyChartBarEmpty${i}Fill`} />
             <span className="text-[10px] text-zinc-700">--</span>
           </div>
         ))
@@ -304,25 +308,25 @@ function UsersTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white" data-name="adminDashboard.usersTitle">用户管理</h2>
-        <div className="relative">
+    <div className="space-y-6" data-name="adminUsersTab">
+      <div className="flex items-center justify-between" data-name="adminUsersHeader">
+        <h2 className="text-xl font-bold text-white" data-name="adminUsersTitle">用户管理</h2>
+        <div className="relative" data-name="adminUserSearchWrap">
           <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2  text-zinc-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            data-name="adminDashboard.userSearchInput"
+            data-name="adminUserSearchInput"
             placeholder="搜索用户名或邮箱..."
             className="pl-9 pr-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 w-64 transition-colors"
           />
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminUserTableWrap">
+        <table className="w-full text-sm" data-name="adminUserTable">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-white/5" data-name="adminUserTableHeader">
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">ID</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">用户名</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">邮箱</th>
@@ -332,14 +336,14 @@ function UsersTab() {
               <th className="text-right px-5 py-3 text-zinc-400 font-medium">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-name="adminUserTableBody">
             {users.map((u) => (
-              <tr key={u.id} data-name={`adminDashboard.userRow.${u.id}`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+              <tr key={u.id} data-name={`adminUser${u.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                 <td className="px-5 py-3 text-zinc-500 font-mono text-xs">{u.id}</td>
                 <td className="px-5 py-3 text-white font-medium">{u.username}</td>
                 <td className="px-5 py-3 text-zinc-400">{u.email}</td>
                 <td className="px-5 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${roleColor(u.role)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${roleColor(u.role)}`} data-name={`adminUser${u.id}RoleBadge`}>
                     {roleLabel(u.role)}
                   </span>
                 </td>
@@ -350,6 +354,7 @@ function UsersTab() {
                         ? 'bg-emerald-500/15 text-emerald-300'
                         : 'bg-red-500/15 text-red-300'
                     }`}
+                    data-name={`adminUser${u.id}StatusBadge`}
                   >
                     {u.status === 1 ? '正常' : '禁用'}
                   </span>
@@ -358,7 +363,7 @@ function UsersTab() {
                 <td className="px-5 py-3 text-right">
                   <button
                     onClick={() => handleToggleStatus(u.id)}
-                    data-name={`adminDashboard.userRow.${u.id}.toggleBtn`}
+                    data-name={`adminUserRow${u.id}ToggleBtn`}
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                       u.status === 1
                         ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20'
@@ -379,7 +384,7 @@ function UsersTab() {
               </tr>
             ))}
             {users.length === 0 && (
-              <tr>
+              <tr data-name="adminUserTableEmpty">
                 <td colSpan={7} className="px-5 py-10 text-center text-zinc-500">
                   未找到匹配用户
                 </td>
@@ -547,12 +552,13 @@ function ModerationTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white" data-name="adminDashboard.moderationTitle">内容审核</h2>
+    <div className="space-y-6" data-name="adminModerationTab">
+      <div className="flex items-center justify-between" data-name="adminModerationHeader">
+        <h2 className="text-xl font-bold text-white" data-name="adminModerationTitle">内容审核</h2>
         {subTab === 'rules' && (
           <button
             onClick={() => setShowRuleModal(true)}
+            data-name="adminCreateRuleBtn"
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
           >
             <IconPlus size={16} /> 创建规则
@@ -561,12 +567,13 @@ function ModerationTab() {
       </div>
 
       {/* Sub tabs + summary */}
-      <div className="flex items-center gap-4">
-        <div className="flex gap-1 p-1 bg-white/5 rounded-lg">
+      <div className="flex items-center gap-4" data-name="adminModerationSubTabWrap">
+        <div className="flex gap-1 p-1 bg-white/5 rounded-lg" data-name="adminModerationSubTabGroup">
           {(['records', 'rules'] as const).map((key) => (
             <button
               key={key}
               onClick={() => setSubTab(key)}
+              data-name={`adminModerationSubTab${key}`}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 subTab === key
                   ? 'bg-gradient-to-r from-blue-600/80 to-cyan-500/60 text-white'
@@ -578,19 +585,19 @@ function ModerationTab() {
           ))}
         </div>
         {subTab === 'records' && records.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs" data-name="adminModerationSummary">
             {pendingCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium" data-name="adminModerationPendingCount">
                 {pendingCount} 待审核
               </span>
             )}
             {approvedCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-medium" data-name="adminModerationApprovedCount">
                 {approvedCount} 已通过
               </span>
             )}
             {rejectedCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 font-medium" data-name="adminModerationRejectedCount">
                 {rejectedCount} 已拒绝
               </span>
             )}
@@ -600,12 +607,13 @@ function ModerationTab() {
 
       {/* Status filter for records */}
       {subTab === 'records' && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-name="adminModerationFilterBar">
           <IconFilter size={16} className="text-zinc-500" />
           {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
+              data-name={`adminModerationFilter${s}`}
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === s
                   ? 'bg-white/10 text-white'
@@ -619,15 +627,15 @@ function ModerationTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex items-center justify-center py-20" data-name="adminModerationLoadingSpinner">
           <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : subTab === 'rules' ? (
         /* ========== Rules List ========== */
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminRuleTableWrap">
+          <table className="w-full text-sm" data-name="adminRuleTable">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-white/5" data-name="adminRuleTableHeader">
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">类型</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">匹配模式</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">动作</th>
@@ -636,18 +644,18 @@ function ModerationTab() {
                 <th className="text-right px-5 py-3 text-zinc-400 font-medium">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-name="adminRuleTableBody">
               {rules.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                <tr key={r.id} data-name={`adminRule${r.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3 text-zinc-300">{typeLabel(r.type)}</td>
                   <td className="px-5 py-3 text-white font-mono text-xs">{r.pattern}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${actionColor(r.action)}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${actionColor(r.action)}`} data-name={`adminRule${r.id}ActionBadge`}>
                       {actionLabel(r.action)}
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`} data-name={`adminRule${r.id}StatusBadge`}>
                       {statusLabel(r.status)}
                     </span>
                   </td>
@@ -655,6 +663,7 @@ function ModerationTab() {
                   <td className="px-5 py-3 text-right">
                     <button
                       onClick={() => handleToggleRuleStatus(r.id)}
+                      data-name={`adminRule${r.id}ToggleBtn`}
                       className="p-1.5 rounded-lg text-zinc-500 hover:text-cyan-400 hover:bg-white/5 transition-colors"
                       title={r.status === 1 ? '禁用' : '启用'}
                     >
@@ -668,7 +677,7 @@ function ModerationTab() {
                 </tr>
               ))}
               {rules.length === 0 && (
-                <tr>
+                <tr data-name="adminRuleTableEmpty">
                   <td colSpan={6} className="px-5 py-10 text-center text-zinc-500">
                     暂无审核规则
                   </td>
@@ -679,10 +688,11 @@ function ModerationTab() {
         </div>
       ) : (
         /* ========== Records List ========== */
-        <div className="space-y-3">
+        <div className="space-y-3" data-name="adminRecordList">
           {records.map((r) => (
             <div
               key={r.id}
+              data-name={`adminRecord${r.id}Card`}
               className="rounded-xl border border-white/5 bg-white/[0.02] p-5 hover:bg-white/[0.03] transition-colors"
             >
               {/* Record header row */}
@@ -690,11 +700,11 @@ function ModerationTab() {
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-3 flex-wrap">
                     {/* Target type badge */}
-                    <span className="px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 text-xs font-medium">
+                    <span className="px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 text-xs font-medium" data-name={`adminRecord${r.id}TypeBadge`}>
                       {targetTypeLabel(r.targetType)}
                     </span>
                     {/* Status badge */}
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`} data-name={`adminRecord${r.id}StatusBadge`}>
                       {statusLabel(r.status)}
                     </span>
                     {/* Reason tag */}
@@ -705,18 +715,18 @@ function ModerationTab() {
                     <span className="text-zinc-600 text-xs">{r.createdAt}</span>
                   </div>
                   {/* Content preview */}
-                  <div className="text-sm text-zinc-300">
+                  <div className="text-sm text-zinc-300" data-name={`adminRecord${r.id}Content`}>
                     <span className="text-zinc-500 mr-1">目标ID:</span>
                     <span className="font-mono text-xs text-white">{r.targetId}</span>
                     {r.content && (
-                      <div className="mt-1.5 text-zinc-400 text-xs line-clamp-2 bg-white/[0.02] rounded-lg px-3 py-2 border border-white/[0.03]">
+                      <div className="mt-1.5 text-zinc-400 text-xs line-clamp-2 bg-white/[0.02] rounded-lg px-3 py-2 border border-white/[0.03]" data-name={`adminRecord${r.id}ContentPreview`}>
                         {r.content}
                       </div>
                     )}
                   </div>
                   {/* Review info */}
                   {(r.reviewNote || r.reviewer || r.reviewedAt) && (
-                    <div className="text-xs text-zinc-500 flex items-center gap-3 flex-wrap">
+                    <div className="text-xs text-zinc-500 flex items-center gap-3 flex-wrap" data-name={`adminRecord${r.id}ReviewInfo`}>
                       {r.reviewer && <span>审核人: {r.reviewer}</span>}
                       {r.reviewNote && <span>备注: {r.reviewNote}</span>}
                       {r.reviewedAt && <span>审核时间: {r.reviewedAt}</span>}
@@ -726,9 +736,10 @@ function ModerationTab() {
 
                 {/* Action buttons - only for pending */}
                 {r.status === 'pending' && (
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0" data-name={`adminRecord${r.id}Actions`}>
                     <button
                       onClick={() => openReviewModal(r, 'approve')}
+                      data-name={`adminRecord${r.id}ApproveBtn`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors"
                       title="通过"
                     >
@@ -736,6 +747,7 @@ function ModerationTab() {
                     </button>
                     <button
                       onClick={() => openReviewModal(r, 'reject')}
+                      data-name={`adminRecord${r.id}RejectBtn`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors"
                       title="拒绝"
                     >
@@ -747,7 +759,7 @@ function ModerationTab() {
             </div>
           ))}
           {records.length === 0 && (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] px-5 py-16 text-center">
+            <div className="rounded-xl border border-white/5 bg-white/[0.02] px-5 py-16 text-center" data-name="adminRecordListEmpty">
               <IconShield size={40} className="text-zinc-700 mx-auto mb-3" />
               <p className="text-zinc-500 text-sm">
                 {statusFilter === 'all' ? '暂无审核记录' : `暂无${statusLabel(statusFilter)}的记录`}
@@ -759,12 +771,13 @@ function ModerationTab() {
 
       {/* Create Rule Modal */}
       <Modal open={showRuleModal} onClose={() => setShowRuleModal(false)} title="创建审核规则">
-        <div className="space-y-4">
+        <div className="space-y-4" data-name="adminCreateRuleForm">
           <div>
             <label className="block text-xs text-zinc-400 mb-1.5 block">规则类型</label>
             <select
               value={newRule.type}
               onChange={(e) => setNewRule((p) => ({ ...p, type: e.target.value }))}
+              data-name="adminCreateRuleTypeSelect"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500/50"
             >
               <option value="" className="bg-[hsl(var(--admin-modal-bg))]">请选择</option>
@@ -778,6 +791,7 @@ function ModerationTab() {
             <input
               value={newRule.pattern}
               onChange={(e) => setNewRule((p) => ({ ...p, pattern: e.target.value }))}
+              data-name="adminCreateRulePatternInput"
               placeholder="输入关键词或正则表达式"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50"
             />
@@ -787,6 +801,7 @@ function ModerationTab() {
             <select
               value={newRule.action}
               onChange={(e) => setNewRule((p) => ({ ...p, action: e.target.value }))}
+              data-name="adminCreateRuleActionSelect"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500/50"
             >
               <option value="warn" className="bg-[hsl(var(--admin-modal-bg))]">警告</option>
@@ -794,9 +809,10 @@ function ModerationTab() {
               <option value="review" className="bg-[hsl(var(--admin-modal-bg))]">人工审核</option>
             </select>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2" data-name="adminCreateRuleFormActions">
             <button
               onClick={() => setShowRuleModal(false)}
+              data-name="adminCreateRuleCancelBtn"
               className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               取消
@@ -804,6 +820,7 @@ function ModerationTab() {
             <button
               onClick={handleCreateRule}
               disabled={!newRule.type || !newRule.pattern}
+              data-name="adminCreateRuleSubmitBtn"
               className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium disabled:opacity-40 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
             >
               创建
@@ -818,9 +835,9 @@ function ModerationTab() {
         onClose={() => { setReviewModal({ open: false, record: null, action: null }); setReviewReason(''); }}
         title={reviewModal.action === 'approve' ? '通过审核' : '拒绝内容'}
       >
-        <div className="space-y-4">
+        <div className="space-y-4" data-name="adminReviewActionForm">
           {reviewModal.record && (
-            <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 space-y-1.5">
+            <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3 space-y-1.5" data-name="adminReviewRecordInfo">
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-zinc-500">目标:</span>
                 <span className="text-white font-mono">{reviewModal.record.targetType} / {reviewModal.record.targetId}</span>
@@ -838,20 +855,23 @@ function ModerationTab() {
             <textarea
               value={reviewReason}
               onChange={(e) => setReviewReason(e.target.value)}
+              data-name="adminReviewReasonTextarea"
               placeholder={reviewModal.action === 'approve' ? '填写通过说明...' : '填写拒绝理由...'}
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 resize-none"
             />
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2" data-name="adminReviewActionFormActions">
             <button
               onClick={() => { setReviewModal({ open: false, record: null, action: null }); setReviewReason(''); }}
+              data-name="adminReviewCancelBtn"
               className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               取消
             </button>
             <button
               onClick={handleReviewAction}
+              data-name="adminReviewConfirmBtn"
               className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-all ${
                 reviewModal.action === 'approve'
                   ? 'bg-emerald-600 hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/20'
@@ -949,21 +969,22 @@ function AnnouncementsTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">系统公告</h2>
+    <div className="space-y-6" data-name="adminAnnouncementsTab">
+      <div className="flex items-center justify-between" data-name="adminAnnouncementsHeader">
+        <h2 className="text-xl font-bold text-white" data-name="adminAnnouncementsTitle">系统公告</h2>
         <button
           onClick={() => setShowModal(true)}
+          data-name="adminCreateAnnouncementBtn"
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
         >
           <IconPlus size={16} /> 创建公告
         </button>
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminAnnouncementTableWrap">
+        <table className="w-full text-sm" data-name="adminAnnouncementTable">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-white/5" data-name="adminAnnouncementTableHeader">
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">标题</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">类型</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">优先级</th>
@@ -972,22 +993,22 @@ function AnnouncementsTab() {
               <th className="text-right px-5 py-3 text-zinc-400 font-medium">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-name="adminAnnouncementTableBody">
             {announcements.map((a) => (
-              <tr key={a.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+              <tr key={a.id} data-name={`adminAnnouncement${a.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                 <td className="px-5 py-3 text-white font-medium">{a.title}</td>
                 <td className="px-5 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeColor(a.type)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeColor(a.type)}`} data-name={`adminAnnouncement${a.id}TypeBadge`}>
                     {typeLabel(a.type)}
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityColor(a.priority)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityColor(a.priority)}`} data-name={`adminAnnouncement${a.id}PriorityBadge`}>
                     {priorityLabel(a.priority)}
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300" data-name={`adminAnnouncement${a.id}StatusBadge`}>
                     已发布
                   </span>
                 </td>
@@ -995,6 +1016,7 @@ function AnnouncementsTab() {
                 <td className="px-5 py-3 text-right">
                   <button
                     onClick={() => handleDelete(a.id)}
+                    data-name={`adminAnnouncement${a.id}DeleteBtn`}
                     className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <IconDelete size={16} />
@@ -1003,7 +1025,7 @@ function AnnouncementsTab() {
               </tr>
             ))}
             {announcements.length === 0 && (
-              <tr>
+              <tr data-name="adminAnnouncementTableEmpty">
                 <td colSpan={6} className="px-5 py-10 text-center text-zinc-500">
                   暂无公告
                 </td>
@@ -1015,12 +1037,13 @@ function AnnouncementsTab() {
 
       {/* Create Announcement Modal */}
       <Modal open={showModal} onClose={() => setShowModal(false)} title="创建公告">
-        <div className="space-y-4">
+        <div className="space-y-4" data-name="adminCreateAnnouncementForm">
           <div>
             <label className="block text-xs text-zinc-400 mb-1.5">标题</label>
             <input
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+              data-name="adminAnnouncementTitleInput"
               placeholder="公告标题"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50"
             />
@@ -1030,17 +1053,19 @@ function AnnouncementsTab() {
             <textarea
               value={form.content}
               onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
+              data-name="adminAnnouncementContentTextarea"
               placeholder="公告内容"
               rows={4}
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 resize-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4" data-name="adminAnnouncementTypePriorityGrid">
             <div>
               <label className="block text-xs text-zinc-400 mb-1.5">类型</label>
               <select
                 value={form.type}
                 onChange={(e) => setForm((p) => ({ ...p, type: Number(e.target.value) }))}
+                data-name="adminAnnouncementTypeSelect"
                 className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500/50"
               >
                 <option value={1} className="bg-[hsl(var(--admin-modal-bg))]">系统</option>
@@ -1053,6 +1078,7 @@ function AnnouncementsTab() {
               <select
                 value={form.priority}
                 onChange={(e) => setForm((p) => ({ ...p, priority: Number(e.target.value) }))}
+                data-name="adminAnnouncementPrioritySelect"
                 className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500/50"
               >
                 <option value={0} className="bg-[hsl(var(--admin-modal-bg))]">普通</option>
@@ -1061,9 +1087,10 @@ function AnnouncementsTab() {
               </select>
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2" data-name="adminAnnouncementFormActions">
             <button
               onClick={() => setShowModal(false)}
+              data-name="adminAnnouncementCancelBtn"
               className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               取消
@@ -1071,6 +1098,7 @@ function AnnouncementsTab() {
             <button
               onClick={handleCreate}
               disabled={!form.title || !form.content}
+              data-name="adminAnnouncementSubmitBtn"
               className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium disabled:opacity-40 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
             >
               创建
@@ -1163,12 +1191,13 @@ function SecurityTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">安全管理</h2>
+    <div className="space-y-6" data-name="adminSecurityTab">
+      <div className="flex items-center justify-between" data-name="adminSecurityHeader">
+        <h2 className="text-xl font-bold text-white" data-name="adminSecurityTitle">安全管理</h2>
         {subTab === 'blacklist' && (
           <button
             onClick={() => setShowAddModal(true)}
+            data-name="adminAddIpBtn"
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
           >
             <IconPlus size={16} /> 添加IP
@@ -1177,11 +1206,12 @@ function SecurityTab() {
       </div>
 
       {/* Sub tabs */}
-      <div className="flex gap-1 p-1 bg-white/5 rounded-lg w-fit">
+      <div className="flex gap-1 p-1 bg-white/5 rounded-lg w-fit" data-name="adminSecuritySubTabGroup">
         {(['blacklist', 'risk'] as const).map((key) => (
           <button
             key={key}
             onClick={() => setSubTab(key)}
+            data-name={`adminSecuritySubTab${key}`}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
               subTab === key
                 ? 'bg-gradient-to-r from-blue-600/80 to-cyan-500/60 text-white'
@@ -1194,14 +1224,14 @@ function SecurityTab() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex items-center justify-center py-20" data-name="adminSecurityLoadingSpinner">
           <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : subTab === 'blacklist' ? (
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminBlacklistTableWrap">
+          <table className="w-full text-sm" data-name="adminBlacklistTable">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-white/5" data-name="adminBlacklistTableHeader">
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">IP地址</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">原因</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">添加者</th>
@@ -1209,9 +1239,9 @@ function SecurityTab() {
                 <th className="text-right px-5 py-3 text-zinc-400 font-medium">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-name="adminBlacklistTableBody">
               {blacklist.map((b) => (
-                <tr key={b.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                <tr key={b.id} data-name={`adminBlacklist${b.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3 text-white font-mono text-xs">{b.ip}</td>
                   <td className="px-5 py-3 text-zinc-400">{b.reason}</td>
                   <td className="px-5 py-3 text-zinc-500 text-xs">{b.createdBy}</td>
@@ -1219,6 +1249,7 @@ function SecurityTab() {
                   <td className="px-5 py-3 text-right">
                     <button
                       onClick={() => handleRemoveIp(b.id)}
+                      data-name={`adminBlacklist${b.id}DeleteBtn`}
                       className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                       <IconDelete size={16} />
@@ -1227,7 +1258,7 @@ function SecurityTab() {
                 </tr>
               ))}
               {blacklist.length === 0 && (
-                <tr>
+                <tr data-name="adminBlacklistTableEmpty">
                   <td colSpan={5} className="px-5 py-10 text-center text-zinc-500">
                     暂无IP黑名单
                   </td>
@@ -1237,10 +1268,10 @@ function SecurityTab() {
           </table>
         </div>
       ) : (
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminRiskTableWrap">
+          <table className="w-full text-sm" data-name="adminRiskTable">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-white/5" data-name="adminRiskTableHeader">
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">用户ID</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">风险类型</th>
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">风险等级</th>
@@ -1248,13 +1279,13 @@ function SecurityTab() {
                 <th className="text-left px-5 py-3 text-zinc-400 font-medium">时间</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-name="adminRiskTableBody">
               {risks.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                <tr key={r.id} data-name={`adminRisk${r.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3 text-white font-mono text-xs">{r.userId}</td>
                   <td className="px-5 py-3 text-zinc-300">{r.riskType}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${riskLevelColor(r.riskLevel)}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${riskLevelColor(r.riskLevel)}`} data-name={`adminRisk${r.id}LevelBadge`}>
                       {riskLevelLabel(r.riskLevel)} (L{r.riskLevel})
                     </span>
                   </td>
@@ -1263,7 +1294,7 @@ function SecurityTab() {
                 </tr>
               ))}
               {risks.length === 0 && (
-                <tr>
+                <tr data-name="adminRiskTableEmpty">
                   <td colSpan={5} className="px-5 py-10 text-center text-zinc-500">
                     暂无风险评估记录
                   </td>
@@ -1276,12 +1307,13 @@ function SecurityTab() {
 
       {/* Add IP Modal */}
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="添加IP黑名单">
-        <div className="space-y-4">
+        <div className="space-y-4" data-name="adminAddIpForm">
           <div>
             <label className="block text-xs text-zinc-400 mb-1.5">IP地址</label>
             <input
               value={newIp.ip}
               onChange={(e) => setNewIp((p) => ({ ...p, ip: e.target.value }))}
+              data-name="adminAddIpInput"
               placeholder="例如: 192.168.1.100"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50"
             />
@@ -1291,13 +1323,15 @@ function SecurityTab() {
             <input
               value={newIp.reason}
               onChange={(e) => setNewIp((p) => ({ ...p, reason: e.target.value }))}
+              data-name="adminAddIpReasonInput"
               placeholder="封禁原因"
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50"
             />
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2" data-name="adminAddIpFormActions">
             <button
               onClick={() => setShowAddModal(false)}
+              data-name="adminAddIpCancelBtn"
               className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               取消
@@ -1305,6 +1339,7 @@ function SecurityTab() {
             <button
               onClick={handleAddIp}
               disabled={!newIp.ip || !newIp.reason}
+              data-name="adminAddIpSubmitBtn"
               className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-medium disabled:opacity-40 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
             >
               添加
@@ -1388,35 +1423,36 @@ function ConfigTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center py-20" data-name="adminConfigLoadingSpinner">
         <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-white">系统配置</h2>
+    <div className="space-y-6" data-name="adminConfigTab">
+      <h2 className="text-xl font-bold text-white" data-name="adminConfigTitle">系统配置</h2>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminConfigTableWrap">
+        <table className="w-full text-sm" data-name="adminConfigTable">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-white/5" data-name="adminConfigTableHeader">
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">键</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">值</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">描述</th>
               <th className="text-right px-5 py-3 text-zinc-400 font-medium">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-name="adminConfigTableBody">
             {configs.map((c) => (
-              <tr key={c.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+              <tr key={c.id} data-name={`adminConfig${c.id}Row`} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                 <td className="px-5 py-3 text-cyan-300 font-mono text-xs">{c.key}</td>
                 <td className="px-5 py-3">
                   {editingId === c.id ? (
                     <input
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
+                      data-name={`adminConfig${c.id}EditInput`}
                       className="px-2 py-1 rounded bg-white/5 border border-cyan-500/50 text-sm text-white focus:outline-none w-40"
                       autoFocus
                     />
@@ -1427,15 +1463,17 @@ function ConfigTab() {
                 <td className="px-5 py-3 text-zinc-400">{c.description}</td>
                 <td className="px-5 py-3 text-right">
                   {editingId === c.id ? (
-                    <div className="inline-flex items-center gap-1">
+                    <div className="inline-flex items-center gap-1" data-name={`adminConfig${c.id}EditActions`}>
                       <button
                         onClick={() => saveEdit(c)}
+                        data-name={`adminConfig${c.id}SaveBtn`}
                         className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                       >
                         <IconCheck size={16} />
                       </button>
                       <button
                         onClick={cancelEdit}
+                        data-name={`adminConfig${c.id}CancelBtn`}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                       >
                         <IconClose size={16} />
@@ -1444,6 +1482,7 @@ function ConfigTab() {
                   ) : (
                     <button
                       onClick={() => startEdit(c)}
+                      data-name={`adminConfig${c.id}EditBtn`}
                       className="p-1.5 rounded-lg text-zinc-500 hover:text-cyan-400 hover:bg-white/5 transition-colors"
                     >
                       <IconEdit size={16} />
@@ -1453,7 +1492,7 @@ function ConfigTab() {
               </tr>
             ))}
             {configs.length === 0 && (
-              <tr>
+              <tr data-name="adminConfigTableEmpty">
                 <td colSpan={4} className="px-5 py-10 text-center text-zinc-500">
                   暂无配置项
                 </td>
@@ -1486,16 +1525,16 @@ function AuditTab() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center py-20" data-name="adminAuditLoadingSpinner"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
   return (
-    <div className="space-y-6" data-name="adminDashboard.auditTab">
-      <h2 className="text-xl font-bold text-white">审计日志</h2>
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
-        <table className="w-full text-sm">
+    <div className="space-y-6" data-name="adminAuditTab">
+      <h2 className="text-xl font-bold text-white" data-name="adminAuditTitle">审计日志</h2>
+      <div className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden" data-name="adminAuditTableWrap">
+        <table className="w-full text-sm" data-name="adminAuditTable">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-white/5" data-name="adminAuditTableHeader">
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">时间</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">操作人</th>
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">操作</th>
@@ -1504,13 +1543,13 @@ function AuditTab() {
               <th className="text-left px-5 py-3 text-zinc-400 font-medium">IP</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-name="adminAuditTableBody">
             {logs.map((log) => (
-              <tr key={log.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <tr key={log.id} data-name={`adminAudit${log.id}Row`} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                 <td className="px-5 py-3 text-zinc-300 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
                 <td className="px-5 py-3 text-zinc-300">{log.operatorName || log.operatorId?.slice(0, 8)}</td>
                 <td className="px-5 py-3">
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-500/10 text-cyan-400">
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-500/10 text-cyan-400" data-name={`adminAudit${log.id}ActionBadge`}>
                     {actionLabel[log.action] || log.action}
                   </span>
                 </td>
@@ -1520,7 +1559,7 @@ function AuditTab() {
               </tr>
             ))}
             {logs.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-zinc-500">暂无审计日志</td></tr>
+              <tr data-name="adminAuditTableEmpty"><td colSpan={6} className="px-5 py-10 text-center text-zinc-500">暂无审计日志</td></tr>
             )}
           </tbody>
         </table>
@@ -1560,47 +1599,50 @@ function FeedbackTab() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center py-20" data-name="adminFeedbackLoadingSpinner"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
   return (
-    <div className="space-y-6" data-name="adminDashboard.feedbackTab">
-      <h2 className="text-xl font-bold text-white">反馈处理</h2>
-      <div className="space-y-3">
+    <div className="space-y-6" data-name="adminFeedbackTab">
+      <h2 className="text-xl font-bold text-white" data-name="adminFeedbackTitle">反馈处理</h2>
+      <div className="space-y-3" data-name="adminFeedbackList">
         {feedbacks.map((fb) => {
           const sl = statusLabel[fb.status] || { text: fb.status, cls: 'bg-zinc-500/10 text-zinc-400' };
           return (
-            <div key={fb.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-5">
-              <div className="flex items-start justify-between gap-4 mb-3">
+            <div key={fb.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-5" data-name={`adminFeedback${fb.id}Card`}>
+              <div className="flex items-start justify-between gap-4 mb-3" data-name={`adminFeedback${fb.id}Header`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium text-white truncate">{fb.title}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${sl.cls}`}>{sl.text}</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${sl.cls}`} data-name={`adminFeedback${fb.id}StatusBadge`}>{sl.text}</span>
                   </div>
                   <p className="text-sm text-zinc-400 line-clamp-2">{fb.content}</p>
                 </div>
                 <span className="text-xs text-zinc-500 shrink-0">{new Date(fb.createdAt).toLocaleDateString()}</span>
               </div>
               {fb.adminReply && (
-                <div className="mt-2 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-sm text-zinc-300">
+                <div className="mt-2 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-sm text-zinc-300" data-name={`adminFeedback${fb.id}AdminReply`}>
                   <span className="text-cyan-400 font-medium">管理员回复：</span>{fb.adminReply}
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3" data-name={`adminFeedback${fb.id}Actions`}>
                 {fb.status === 'pending' && (
                   <button onClick={() => handleStatus(fb.id, 'processing')} disabled={processing === fb.id}
+                    data-name={`adminFeedback${fb.id}ProcessBtn`}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50">
                     开始处理
                   </button>
                 )}
                 {fb.status === 'processing' && (
                   <button onClick={() => handleStatus(fb.id, 'resolved')} disabled={processing === fb.id}
+                    data-name={`adminFeedback${fb.id}ResolveBtn`}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-50">
                     标记解决
                   </button>
                 )}
                 {fb.status !== 'closed' && (
                   <button onClick={() => handleStatus(fb.id, 'closed')} disabled={processing === fb.id}
+                    data-name={`adminFeedback${fb.id}CloseBtn`}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-500/10 text-zinc-400 hover:bg-zinc-500/20 transition-colors disabled:opacity-50">
                     关闭
                   </button>
@@ -1610,7 +1652,7 @@ function FeedbackTab() {
           );
         })}
         {feedbacks.length === 0 && (
-          <div className="text-center py-20 text-zinc-500">暂无反馈</div>
+          <div className="text-center py-20 text-zinc-500" data-name="adminFeedbackListEmpty">暂无反馈</div>
         )}
       </div>
     </div>
@@ -1627,7 +1669,7 @@ export function AdminDashboard() {
   // 权限检查
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="adminDashboard.NoAuth">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="adminNoAuth">
           <p className="text-zinc-500 text-sm">请先登录后再访问管理后台</p>
         </div>
     );
@@ -1635,7 +1677,7 @@ export function AdminDashboard() {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="adminDashboard.NoPerm">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="adminNoPerm">
           <p className="text-zinc-500 text-sm">仅管理员可访问此页面</p>
         </div>
     );
@@ -1663,7 +1705,7 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen text-white" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="adminDashboard">
+    <div className="min-h-screen text-white" style={{ backgroundColor: 'hsl(var(--admin-bg))' }} data-name="admin">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -1676,24 +1718,25 @@ export function AdminDashboard() {
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'ml-16' : 'ml-56'
         }`}
+        data-name="adminMainContent"
       >
         {/* Top bar */}
-        <header className="sticky top-0 z-20 h-16 flex items-center justify-between px-8 border-b border-white/5 backdrop-blur-xl" style={{ backgroundColor: 'hsl(var(--admin-bg) / 0.8)' }} data-name="adminDashboard.header">
+        <header className="sticky top-0 z-20 h-16 flex items-center justify-between px-8 border-b border-white/5 backdrop-blur-xl" style={{ backgroundColor: 'hsl(var(--admin-bg) / 0.8)' }} data-name="adminHeader">
           <div>
-            <h1 className="text-sm font-semibold text-white" data-name="adminDashboard.headerTitle">
+            <h1 className="text-sm font-semibold text-white" data-name="adminHeaderTitle">
               {sidebarItems.find((i) => i.key === activeTab)?.label || '管理后台'}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white" data-name="adminDashboard.userAvatar">
+          <div className="flex items-center gap-3" data-name="adminHeaderUserArea">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white" data-name="adminUserAvatar">
               {user?.username?.charAt(0).toUpperCase() || 'A'}
             </div>
-            <span className="text-sm text-zinc-400" data-name="adminDashboard.username">{user?.username || 'Admin'}</span>
+            <span className="text-sm text-zinc-400" data-name="adminUsername">{user?.username || 'Admin'}</span>
           </div>
         </header>
 
         {/* Tab content */}
-        <div className="p-8">{renderTab()}</div>
+        <div className="p-8" data-name="adminTabContent">{renderTab()}</div>
       </main>
     </div>
   );

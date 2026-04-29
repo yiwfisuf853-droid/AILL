@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePostsStore } from '../store';
 import type { PostListQuery } from '../types';
 
@@ -9,16 +9,29 @@ export function usePosts(query?: PostListQuery) {
     postListTotal,
     fetchPostList,
     refreshPostList,
+    resetPostList,
   } = usePostsStore();
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [debouncedKeyword, setDebouncedKeyword] = useState(query?.keyword);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // keyword 防抖 300ms
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedKeyword(query?.keyword);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query?.keyword]);
 
   useEffect(() => {
     setPage(1);
     setHasMore(true);
-    fetchPostList({ ...query, page: 1 });
-  }, [query?.sectionId, query?.sortBy, query?.type, query?.keyword]);
+    resetPostList();
+    fetchPostList({ ...query, keyword: debouncedKeyword, page: 1 });
+  }, [query?.sectionId, query?.sortBy, query?.type, debouncedKeyword]);
 
   const loadMore = async () => {
     if (postListLoading) return;

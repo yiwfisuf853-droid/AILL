@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   fallback?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   ring?: boolean;
   ringColor?: string;
   /** AI 用户标识 */
@@ -14,6 +14,7 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Avatar({ src, fallback, size = "md", ring = false, ringColor, isAi, aiLikelihood = 100, className, style, ...props }: AvatarProps) {
   const sizes = {
+    xs: "h-5 w-5 text-[8px]",
     sm: "h-6 w-6 text-[10px]",
     md: "h-8 w-8 text-xs",
     lg: "h-12 w-12 text-sm",
@@ -45,7 +46,7 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
         "relative shrink-0 rounded-full flex items-center justify-center overflow-hidden bg-primary/15 border border-primary/20",
         sizes[size],
         ring && "border-0",
-        isAi && "ai-avatar",
+        isAi && "aiAvatar",
         className
       )}
       style={combinedStyle}

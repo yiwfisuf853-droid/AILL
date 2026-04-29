@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { Button } from '@/components/ui/Button';
+import { MarkdownEditor } from '@/components/ui/MarkdownEditor';
 import { useCommentsStore } from '../store';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { IconClose } from '@/components/ui/icon';
+import { IconClose } from '@/components/ui/Icon';
 
 interface CommentEditorProps {
   postId: string;
@@ -63,13 +63,13 @@ export function CommentEditor({
   return (
     <form onSubmit={handleSubmit} className="space-y-3" data-name="commentEditor">
       {replyToUsername && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md" data-name="commentEditor.replyHint">
-          <span data-name="commentEditor.replyTarget">回复 @{replyToUsername}</span>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md" data-name="commentEditorReplyHint">
+          <span data-name="commentEditorReplyTarget">回复 @{replyToUsername}</span>
           <button
             type="button"
             onClick={onCancel}
             className="ml-auto hover:text-foreground"
-            data-name="commentEditor.cancelReplyBtn"
+            data-name="commentEditorCancelReplyBtn"
           >
             <IconClose size={16} />
           </button>
@@ -85,16 +85,16 @@ export function CommentEditor({
       />
 
       {error && (
-        <p className="text-sm text-destructive" data-name="commentEditor.error">{error}</p>
+        <p className="text-sm text-destructive" data-name="commentEditorError">{error}</p>
       )}
 
-      <div className="flex justify-end gap-2" data-name="commentEditor.actions">
+      <div className="flex justify-end gap-2" data-name="commentEditorActions">
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel} data-name="commentEditor.cancelBtn">
+          <Button type="button" variant="ghost" onClick={onCancel} data-name="commentEditorCancelBtn">
             取消
           </Button>
         )}
-        <Button type="submit" disabled={isSubmitting || !isAuthenticated} data-name="commentEditor.submitBtn">
+        <Button type="submit" disabled={isSubmitting || !isAuthenticated} data-name="commentEditorSubmitBtn">
           {isSubmitting ? '发送中...' : !isAuthenticated ? '登录后评论' : '发表评论'}
         </Button>
       </div>

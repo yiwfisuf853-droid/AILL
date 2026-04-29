@@ -13,11 +13,11 @@ import {
   getFileMetadata,
   createFileMetadata,
   deleteFileMetadata,
-  getSysConfigs,
-  getSysConfig,
-  setSysConfig,
+  getSystemConfigs,
+  getSystemConfig,
+  setSystemConfig,
 } from '../services/security.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { loginAttemptSchema, ipBlacklistSchema, deviceBlacklistSchema, riskAssessmentSchema, fileMetaSchema, setConfigSchema } from '../validations/security.js';
 import { asyncHandler, ValidationError } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
@@ -35,7 +35,7 @@ router.get('/login-check', asyncHandler(async (req, res) => {
 }));
 
 // 记录登录尝试
-router.post('/login-attempt', validate(loginAttemptSchema), asyncHandler(async (req, res) => {
+router.post('/login-attempt', validateRequest(loginAttemptSchema), asyncHandler(async (req, res) => {
   const result = await recordLoginAttempt(req.body);
   created(res, result);
 }));
@@ -49,7 +49,7 @@ router.get('/ip-blacklist', asyncHandler(async (req, res) => {
 }));
 
 // 添加IP黑名单
-router.post('/ip-blacklist', validate(ipBlacklistSchema), asyncHandler(async (req, res) => {
+router.post('/ip-blacklist', validateRequest(ipBlacklistSchema), asyncHandler(async (req, res) => {
   const result = await addIpToBlacklist(req.body);
   created(res, result);
 }));
@@ -69,7 +69,7 @@ router.get('/blocked-devices', asyncHandler(async (req, res) => {
 }));
 
 // 添加设备黑名单
-router.post('/blocked-devices', validate(deviceBlacklistSchema), asyncHandler(async (req, res) => {
+router.post('/blocked-devices', validateRequest(deviceBlacklistSchema), asyncHandler(async (req, res) => {
   const result = await addDeviceToBlacklist(req.body);
   created(res, result);
 }));
@@ -89,7 +89,7 @@ router.get('/risk-assessments', asyncHandler(async (req, res) => {
 }));
 
 // 创建/更新风险评估
-router.post('/risk-assessments', validate(riskAssessmentSchema), asyncHandler(async (req, res) => {
+router.post('/risk-assessments', validateRequest(riskAssessmentSchema), asyncHandler(async (req, res) => {
   const result = await upsertRiskAssessment(req.body);
   created(res, result);
 }));
@@ -103,7 +103,7 @@ router.get('/files', asyncHandler(async (req, res) => {
 }));
 
 // 创建文件元数据
-router.post('/files', validate(fileMetaSchema), asyncHandler(async (req, res) => {
+router.post('/files', validateRequest(fileMetaSchema), asyncHandler(async (req, res) => {
   const result = await createFileMetadata(req.body);
   created(res, result);
 }));
@@ -118,19 +118,19 @@ router.delete('/files/:id', asyncHandler(async (req, res) => {
 
 // 获取全部配置
 router.get('/config', asyncHandler(async (req, res) => {
-  const result = await getSysConfigs();
+  const result = await getSystemConfigs();
   success(res, result);
 }));
 
 // 获取单个配置
 router.get('/config/:key', asyncHandler(async (req, res) => {
-  const result = await getSysConfig(req.params.key);
+  const result = await getSystemConfig(req.params.key);
   success(res, result || { configKey: req.params.key, configValue: null });
 }));
 
 // 设置配置
-router.post('/config', validate(setConfigSchema), asyncHandler(async (req, res) => {
-  const result = await setSysConfig(req.body);
+router.post('/config', validateRequest(setConfigSchema), asyncHandler(async (req, res) => {
+  const result = await setSystemConfig(req.body);
   created(res, result);
 }));
 

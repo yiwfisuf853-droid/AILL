@@ -46,6 +46,7 @@ export interface Subscription {
 export interface CreateSubscriptionDto {
   type: SubscriptionType;
   targetId: string;
+  targetName?: string;
   notificationSettings?: Subscription['notificationSettings'];
 }
 

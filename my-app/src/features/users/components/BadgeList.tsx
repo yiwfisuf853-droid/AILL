@@ -31,7 +31,7 @@ export const BadgeList = memo(function BadgeList({ badges, className = '' }: Bad
             key={ua.id}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r border ${badgeColors[i % badgeColors.length]}`}
             title={description}
-            data-name={`badgeList.badge.${ua.id}`}
+            data-name={`badgeListBadge${ua.id}`}
           >
             {achievement.icon && <span>{achievement.icon}</span>}
             {achievement.name}

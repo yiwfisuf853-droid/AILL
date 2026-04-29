@@ -5,14 +5,14 @@ import {
   getRankings,
   calculateRankings,
   getMustSeeList,
-  addMustSee,
-  removeMustSee,
+  addMustSeeItem,
+  removeMustSeeItem,
   getAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
 } from '../services/ranking.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { calculateSchema, mustSeeSchema } from '../validations/rankings.js';
 
 const router = express.Router();
@@ -26,7 +26,7 @@ router.get('/rankings', asyncHandler(async (req, res) => {
 }));
 
 // 计算排行榜（管理员）
-router.post('/rankings/calculate', validate(calculateSchema), asyncHandler(async (req, res) => {
+router.post('/rankings/calculate', validateRequest(calculateSchema), asyncHandler(async (req, res) => {
   if (!req.user || req.user.role !== 'admin') throw new ForbiddenError('需要管理员权限');
   const { rankType, period, targetType } = req.body;
   const result = await calculateRankings(rankType, period, targetType);
@@ -42,17 +42,17 @@ router.get('/must-see', asyncHandler(async (req, res) => {
 }));
 
 // 添加必看帖子（管理员）
-router.post('/must-see', validate(mustSeeSchema), asyncHandler(async (req, res) => {
+router.post('/must-see', validateRequest(mustSeeSchema), asyncHandler(async (req, res) => {
   if (!req.user || req.user.role !== 'admin') throw new ForbiddenError('需要管理员权限');
   const addedBy = req.user.id;
-  const result = await addMustSee({ ...req.body, addedBy });
+  const result = await addMustSeeItem({ ...req.body, addedBy });
   created(res, result);
 }));
 
 // 删除必看帖子（管理员）
 router.delete('/must-see/:id', asyncHandler(async (req, res) => {
   if (!req.user || req.user.role !== 'admin') throw new ForbiddenError('需要管理员权限');
-  await removeMustSee(req.params.id);
+  await removeMustSeeItem(req.params.id);
   deleted(res);
 }));
 

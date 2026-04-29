@@ -124,8 +124,8 @@ export async function addToCart(userId, data) {
 
   const existing = await repo.findOne('carts', { userId, productId: data.productId, deletedAt: null });
   if (existing) {
-    const newQuantity = existing.quantity + (data.quantity || 1);
-    await repo.update('carts', existing.id, { quantity: newQuantity, updatedAt: new Date().toISOString() });
+    await repo.increment('carts', existing.id, 'quantity', data.quantity || 1);
+    await repo.update('carts', existing.id, { updatedAt: new Date().toISOString() });
     const updated = await repo.findById('carts', existing.id);
     return { success: true, item: updated };
   }
@@ -209,7 +209,7 @@ export async function createOrder(userId, data) {
 
     // 扣减库存
     if (product.stock > 0) {
-      await repo.update('products', product.id, { stock: product.stock - quantity });
+      await repo.increment('products', product.id, 'stock', -quantity);
     }
   }
 
@@ -337,7 +337,7 @@ export async function cancelOrder(userId, orderId) {
   for (const oi of orderItems) {
     const product = await repo.findById('products', oi.productId);
     if (product && product.stock >= 0) {
-      await repo.update('products', oi.productId, { stock: product.stock + oi.quantity });
+      await repo.increment('products', oi.productId, 'stock', oi.quantity);
     }
   }
 

@@ -3,11 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { collectionApi } from '@/features/collections/api';
 import type { Collection } from '@/features/collections/types';
 import { useAuthStore } from '@/features/auth/store';
-import { PageSkeleton } from '@/components/ui/skeleton';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PageSkeleton } from '@/components/ui/Skeleton';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { isApiError } from '@/lib/api';
-import { toast } from '@/components/ui/toast';
-import { IconBookOpen, IconCalendar, IconChevronLeft, IconClose, IconComment, IconDelete, IconEye, IconHeart, IconPlus, IconUser } from "@/components/ui/icon";
+import { toast } from '@/components/ui/Toast';
+import { IconBookOpen, IconCalendar, IconChevronLeft, IconClose, IconComment, IconDelete, IconEye, IconHeart, IconPlus, IconUser } from "@/components/ui/Icon";
 
 interface CollectionPost {
   id: string;
@@ -137,7 +137,7 @@ export function CollectionDetailPage() {
   // --- Loading ---
   if (loading) {
     return (
-      <div className="py-3">
+      <div className="py-3" data-name="collectionDetailLoading">
         <PageSkeleton />
       </div>
     );
@@ -146,19 +146,19 @@ export function CollectionDetailPage() {
   // --- Error ---
   if (error || !data) {
     return (
-      <div className="py-3" data-name="collectionDetailPage.Error">
-        <div className="pt-6">
+      <div className="py-3" data-name="collectionDetailError">
+        <div className="pt-6" data-name="collectionDetailErrorContent">
           <Link
             to="/collections"
             className="inline-flex items-center gap-2 text-foreground-tertiary hover:text-primary text-sm mb-6 transition-colors"
-            data-name="collectionDetailPage.errorBackLink"
+            data-name="collectionDetailErrorBackLink"
           >
             <IconChevronLeft size={16} />
             返回合集列表
           </Link>
           <div className="text-center py-20 text-foreground-tertiary">
             <IconBookOpen size={48} className="mx-auto mb-3 opacity-50" />
-            <p data-name="collectionDetailPage.errorText">{error || '合集不存在'}</p>
+            <p data-name="collectionDetailErrorText">{error || '合集不存在'}</p>
           </div>
         </div>
       </div>
@@ -168,34 +168,34 @@ export function CollectionDetailPage() {
   const { collection, posts } = data;
 
   return (
-    <div className="py-3" data-name="collectionDetailPage">
+    <div className="py-3" data-name="collectionDetail">
       {/* Hero Section */}
       <div className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, hsl(210 100% 50% / 0.06) 0%, transparent 40%, hsl(270 65% 55% / 0.04) 100%)' }} />
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20" style={{ background: 'hsl(210 100% 50%)' }} />
-        <div className="relative pt-8 pb-6">
+        <div className="relative pt-8 pb-6" data-name="collectionDetailHeroContent">
           {/* Back link */}
           <Link
             to="/collections"
             className="inline-flex items-center gap-2 text-foreground-tertiary hover:text-primary text-sm mb-6 transition-colors"
-            data-name="collectionDetailPage.backLink"
+            data-name="collectionDetailBackLink"
           >
             <IconChevronLeft size={16} />
             返回合集列表
           </Link>
 
-          <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8" data-name="collectionDetailHeroLayout">
             {/* Cover */}
             <div
               className="flex-shrink-0 w-full md:w-56 aspect-[2/1] md:aspect-[3/4] rounded-2xl bg-gradient-to-br from-muted to-card border border-border/50 overflow-hidden flex items-center justify-center relative"
-              data-name="collectionDetailPage.cover"
+              data-name="collectionDetailCover"
             >
               <IconBookOpen size={64} className="text-foreground-tertiary/20" />
               {collection.type === 2 && (
                 <div className="absolute top-3 left-3">
                   <span
                     className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary"
-                    data-name="collectionDetailPage.officialBadge"
+                    data-name="collectionDetailOfficialBadge"
                   >
                     官方精选
                   </span>
@@ -204,11 +204,11 @@ export function CollectionDetailPage() {
             </div>
 
             {/* Info */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" data-name="collectionDetailHeroInfo">
               <h1
                 className="text-2xl md:text-3xl font-black tracking-tight mb-2"
                 style={{ fontFamily: '"Space Grotesk", sans-serif' }}
-                data-name="collectionDetailPage.title"
+                data-name="collectionDetailTitle"
               >
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-chart-1">
                   {collection.name}
@@ -218,52 +218,52 @@ export function CollectionDetailPage() {
               {collection.description && (
                 <p
                   className="text-foreground-secondary text-sm leading-relaxed mb-4 max-w-2xl"
-                  data-name="collectionDetailPage.desc"
+                  data-name="collectionDetailDesc"
                 >
                   {collection.description}
                 </p>
               )}
 
               {/* Author & Meta */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-foreground-tertiary mb-5">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-foreground-tertiary mb-5" data-name="collectionDetailMeta">
                 {collection.author && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" data-name="collectionDetailAuthor">
                     {collection.author.avatar ? (
                       <img
                         src={collection.author.avatar}
                         alt={collection.author.username}
                         className="w-5 h-5 rounded-full object-cover"
-                        data-name="collectionDetailPage.authorAvatarImg"
+                        data-name="collectionDetailAuthorAvatarImg"
                       />
                     ) : (
                       <div
                         className="w-5 h-5 rounded-full bg-muted flex items-center justify-center"
-                        data-name="collectionDetailPage.authorAvatarFallback"
+                        data-name="collectionDetailAuthorAvatarFallback"
                       >
                         <IconUser size={12} className="text-foreground-tertiary" />
                       </div>
                     )}
                     <span
                       className="text-foreground-secondary"
-                      data-name="collectionDetailPage.authorName"
+                      data-name="collectionDetailAuthorName"
                     >
                       {collection.author.username}
                     </span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" data-name="collectionDetailDateGroup">
                   <IconCalendar size={14} />
-                  <span data-name="collectionDetailPage.date">{formatDate(collection.createdAt)}</span>
+                  <span data-name="collectionDetailDate">{formatDate(collection.createdAt)}</span>
                 </div>
               </div>
 
               {/* Stats */}
-              <div className="flex items-center gap-5 mb-5">
-                <div className="flex items-center gap-1.5 text-sm">
+              <div className="flex items-center gap-5 mb-5" data-name="collectionDetailStats">
+                <div className="flex items-center gap-1.5 text-sm" data-name="collectionDetailPostCountGroup">
                   <IconBookOpen size={16} className="text-primary" />
                   <span
                     className="text-foreground font-medium"
-                    data-name="collectionDetailPage.postCount"
+                    data-name="collectionDetailPostCount"
                   >
                     {collection.postCount}
                   </span>
@@ -277,7 +277,7 @@ export function CollectionDetailPage() {
                   <button
                     onClick={() => setShowAddModal(true)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors"
-                    data-name="collectionDetailPage.addPostBtn"
+                    data-name="collectionDetailAddPostBtn"
                   >
                     <IconPlus size={16} />
                     添加帖子
@@ -285,7 +285,7 @@ export function CollectionDetailPage() {
                   <button
                     onClick={() => setDeleteDialogOpen(true)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm font-medium transition-colors"
-                    data-name="collectionDetailPage.deleteBtn"
+                    data-name="collectionDetailDeleteBtn"
                   >
                     <IconDelete size={16} />
                     删除合集
@@ -298,11 +298,11 @@ export function CollectionDetailPage() {
       </div>
 
       {/* Posts List */}
-      <div className="py-8">
-        <div className="border-t border-border/50 pt-8">
+      <div className="py-8" data-name="collectionDetailPostsContent">
+        <div className="border-t border-border/50 pt-8" data-name="collectionDetailPostsSection">
           <h2
             className="text-lg font-bold mb-6 flex items-center gap-2"
-            data-name="collectionDetailPage.postsTitle"
+            data-name="collectionDetailPostsTitle"
           >
             <IconBookOpen size={20} className="text-primary" />
             合集内容
@@ -312,7 +312,7 @@ export function CollectionDetailPage() {
           {posts.length === 0 ? (
             <div
               className="text-center py-16 text-foreground-tertiary"
-              data-name="collectionDetailPage.postsEmpty"
+              data-name="collectionDetailPostsEmpty"
             >
               <IconBookOpen size={48} className="mx-auto mb-3 opacity-40" />
               <p className="mb-1">此合集暂无帖子</p>
@@ -323,13 +323,13 @@ export function CollectionDetailPage() {
           ) : (
             <div
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              data-name="collectionDetailPage.postsGrid"
+              data-name="collectionDetailPostsGrid"
             >
               {posts.map((cp) => (
                 <div
                   key={cp.id}
-                  className="group relative card-interactive p-5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
-                  data-name={`collectionDetailPage.post.${cp.id}`}
+                  className="group relative cardInteractive p-5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+                  data-name={`collectionDetailPost${cp.id}`}
                 >
                   {/* Remove button for owner */}
                   {isOwner && (
@@ -338,7 +338,7 @@ export function CollectionDetailPage() {
                       disabled={removingId === cp.postId}
                       className="absolute top-3 right-3 p-1.5 rounded-lg bg-muted hover:bg-red-600/30 text-foreground-tertiary hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
                       title="从合集中移除"
-                      data-name={`collectionDetailPage.post.${cp.id}.removeBtn`}
+                      data-name={`collectionDetailPost${cp.id}RemoveBtn`}
                     >
                       <IconClose size={14} />
                     </button>
@@ -347,7 +347,7 @@ export function CollectionDetailPage() {
                   <Link to={`/posts/${cp.post.id}`} className="block">
                     <h3
                       className="font-semibold mb-1.5 group-hover:text-primary transition-colors line-clamp-2 pr-8"
-                      data-name={`collectionDetailPage.post.${cp.id}.title`}
+                      data-name={`collectionDetailPost${cp.id}Title`}
                     >
                       {cp.post.title}
                     </h3>
@@ -355,13 +355,13 @@ export function CollectionDetailPage() {
                     {cp.post.summary && (
                       <p
                         className="text-xs text-foreground-tertiary line-clamp-2 mb-3"
-                        data-name={`collectionDetailPage.post.${cp.id}.summary`}
+                        data-name={`collectionDetailPost${cp.id}Summary`}
                       >
                         {cp.post.summary}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-foreground-tertiary">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-foreground-tertiary" data-name={`collectionDetailPost${cp.id}Meta`}>
                       <span className="text-foreground-secondary">{cp.post.authorName}</span>
                       <div className="flex items-center gap-1">
                         <IconHeart size={12} />
@@ -398,14 +398,14 @@ export function CollectionDetailPage() {
       {/* Add Post Modal */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center glass"
-          data-name="collectionDetailPage.addPostModal"
+          className="fixed inset-0 z-50 flex items-center justify-center effectGlass"
+          data-name="collectionDetailAddPostModal"
         >
-          <div className="w-full max-w-md mx-4 p-6 rounded-2xl bg-card border border-border shadow-elevated">
+          <div className="w-full max-w-md mx-4 p-6 rounded-2xl bg-card border border-border shadow-elevated" data-name="collectionDetailAddPostModalContainer">
             <div className="flex items-center justify-between mb-5">
               <h2
                 className="text-lg font-bold text-foreground"
-                data-name="collectionDetailPage.addPostModal.title"
+                data-name="collectionDetailAddPostModalTitle"
               >
                 添加帖子到合集
               </h2>
@@ -415,12 +415,12 @@ export function CollectionDetailPage() {
                   setAddPostId('');
                 }}
                 className="text-foreground-tertiary hover:text-foreground transition-colors"
-                data-name="collectionDetailPage.addPostModal.closeBtn"
+                data-name="collectionDetailAddPostModalCloseBtn"
               >
                 <IconClose size={20} />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4" data-name="collectionDetailAddPostModalForm">
               <div>
                 <label className="block text-sm text-foreground-secondary mb-1">帖子 ID</label>
                 <input
@@ -428,14 +428,14 @@ export function CollectionDetailPage() {
                   onChange={(e) => setAddPostId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground focus:outline-none focus:border-primary placeholder:text-foreground-tertiary"
                   placeholder="输入帖子 ID"
-                  data-name="collectionDetailPage.addPostModal.postIdInput"
+                  data-name="collectionDetailAddPostModalPostIdInput"
                 />
               </div>
               <button
                 onClick={handleAddPost}
                 disabled={submitting || !addPostId.trim()}
                 className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm transition-colors"
-                data-name="collectionDetailPage.addPostModal.submitBtn"
+                data-name="collectionDetailAddPostModalSubmitBtn"
               >
                 {submitting ? '添加中...' : '添加'}
               </button>

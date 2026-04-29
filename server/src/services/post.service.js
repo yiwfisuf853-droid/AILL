@@ -1,6 +1,8 @@
 import { generateId } from '../lib/id.js';
 import * as repo from '../models/repository.js';
 import { NotFoundError } from '../lib/errors.js';
+import { notifySubscribersNewPost } from './subscription.service.js';
+import { createNotification } from './notification.service.js';
 
 // 获取帖子列表
 export async function getPostList(options = {}) {
@@ -41,6 +43,37 @@ export async function getPostList(options = {}) {
   const res = await repo.rawQuery(
     `SELECT * FROM posts p ${whereClause} ORDER BY ${orderBy} LIMIT $${idx++} OFFSET $${idx}`,
     [...params, pageSize, offset]
+  );
+  const list = res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
+
+  return { list, total, page, pageSize, hasMore: offset + pageSize < total };
+}
+
+// 获取关注用户的帖子流
+export async function getFollowingPosts(userId, options = {}) {
+  const { page = 1, pageSize = 20 } = options;
+
+  // 获取用户关注的用户 ID 列表
+  const followRes = await repo.rawQuery(
+    `SELECT target_id FROM user_relationships WHERE user_id = $1 AND type = 1 AND (deleted IS NOT TRUE) AND (deleted_at IS NULL)`,
+    [userId]
+  );
+  const followingIds = followRes.rows.map(r => r.target_id);
+
+  if (followingIds.length === 0) {
+    return { list: [], total: 0, page, pageSize, hasMore: false };
+  }
+
+  const countRes = await repo.rawQuery(
+    `SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL AND author_id = ANY($1)`,
+    [followingIds]
+  );
+  const total = Number(countRes.rows[0].total);
+  const offset = (page - 1) * pageSize;
+
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts WHERE deleted_at IS NULL AND author_id = ANY($1) ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    [followingIds, pageSize, offset]
   );
   const list = res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
 
@@ -114,6 +147,14 @@ export async function createPost(data) {
   // 更新作者发帖数
   await repo.increment('users', data.authorId, 'postCount', 1);
 
+  // 如果作者为 AI 用户，通知其订阅者
+  const author = await repo.findById('users', data.authorId);
+  if (author?.isAi) {
+    notifySubscribersNewPost(data.authorId, post.id).catch(() => {
+      // 通知失败不影响帖子创建
+    });
+  }
+
   return sanitizePost(post);
 }
 
@@ -172,6 +213,23 @@ export async function likePost(id, userId) {
       targetId: id,
       createdAt: new Date().toISOString(),
     });
+
+    // 通知帖子作者（点赞通知 type=1）
+    try {
+      if (post.authorId !== userId) {
+        const liker = await repo.findById('users', userId);
+        await createNotification({
+          userId: post.authorId,
+          type: 1,
+          title: '点赞通知',
+          content: `${liker?.username || '有人'} 赞了你的帖子`,
+          sourceUserId: userId,
+          targetType: 1,
+          targetId: id,
+        });
+      }
+    } catch (e) { console.error('[通知] 点赞通知失败:', e.message); }
+
     return { likeCount: updated?.likeCount ?? post.likeCount + 1, isLiked: true };
   }
 }
@@ -222,6 +280,80 @@ export async function viewPost(id) {
     await repo.increment('posts', id, 'viewCount', 1);
   }
   return;
+}
+
+// 搜索帖子
+export async function searchPosts(options = {}) {
+  const {
+    keyword,
+    sectionId,
+    authorId,
+    type,
+    tag,
+    sortBy = 'relevance',
+    page = 1,
+    pageSize = 20,
+  } = options;
+
+  if (!keyword || keyword.trim().length === 0) {
+    return { list: [], total: 0, page, pageSize, hasMore: false };
+  }
+
+  const searchTerm = keyword.trim();
+  let whereClause = 'WHERE p.deleted_at IS NULL AND p.status = \'published\'';
+  const params = [];
+  let idx = 1;
+
+  // 全文匹配
+  whereClause += ` AND (p.title ILIKE $${idx++} OR p.content ILIKE $${idx++})`;
+  params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+
+  if (sectionId) { whereClause += ` AND p.section_id = $${idx++}`; params.push(sectionId); }
+  if (type) { whereClause += ` AND p.type = $${idx++}`; params.push(type); }
+  if (authorId) { whereClause += ` AND p.author_id = $${idx++}`; params.push(authorId); }
+  if (tag) { whereClause += ` AND p.tags @> $${idx++}`; params.push(JSON.stringify([tag])); }
+
+  // 相关度排序需要复用标题匹配参数
+  const titleMatchIdx = 1; // $1 即 title ILIKE 参数
+  const orderBy = sortBy === 'latest'
+    ? 'p.created_at DESC'
+    : sortBy === 'hot'
+      ? 'p.hot_score DESC, p.created_at DESC'
+      : `CASE WHEN p.title ILIKE $${titleMatchIdx} THEN 0 ELSE 1 END, p.hot_score DESC, p.created_at DESC`;
+
+  const countRes = await repo.rawQuery(`SELECT COUNT(*) as total FROM posts p ${whereClause}`, params);
+  const total = Number(countRes.rows[0].total);
+
+  const offset = (page - 1) * pageSize;
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts p ${whereClause} ORDER BY ${orderBy} LIMIT $${idx++} OFFSET $${idx}`,
+    [...params, pageSize, offset]
+  );
+
+  const list = res.rows.map(r => {
+    const post = repo.toCamelCase(r);
+    return {
+      ...sanitizePost(post),
+      highlightTitle: highlightText(post.title, searchTerm),
+      highlightContent: highlightText(post.content?.substring(0, 300) || '', searchTerm),
+    };
+  });
+
+  return { list, total, page, pageSize, hasMore: offset + pageSize < total };
+}
+
+// 高亮匹配文本（先 HTML 转义防 XSS，再插入 mark 标签）
+function highlightText(text, keyword) {
+  if (!text || !keyword) return text;
+  const htmlEscaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  return htmlEscaped.replace(regex, '<mark>$1</mark>');
 }
 
 // 清理帖子敏感信息

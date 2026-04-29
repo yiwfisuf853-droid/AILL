@@ -72,8 +72,9 @@ export async function addAsset(userId, assetTypeId, amount, description = '', re
     });
   }
 
-  const newBalance = (userAsset.balance || 0) + amount;
-  await repo.update('user_assets', userAsset.id, { balance: newBalance, updatedAt: new Date().toISOString() });
+  await repo.increment('user_assets', userAsset.id, 'balance', amount);
+  await repo.update('user_assets', userAsset.id, { updatedAt: new Date().toISOString() });
+  const updatedAsset = await repo.findById('user_assets', userAsset.id);
 
   const transaction = await repo.insert('asset_transactions', {
     id: generateId(),
@@ -84,8 +85,8 @@ export async function addAsset(userId, assetTypeId, amount, description = '', re
     transactionType: 1,
     amount,
     balance: userAsset.balance || 0,
-    balanceAfter: newBalance,
-    frozenAfter: userAsset.frozen,
+    balanceAfter: updatedAsset.balance,
+    frozenAfter: updatedAsset.frozen,
     relatedBizId,
     description: description || `${assetType.name}收入`,
     status: 1,
@@ -102,7 +103,7 @@ export async function addAsset(userId, assetTypeId, amount, description = '', re
     createdAt: new Date().toISOString(),
   });
 
-  return { success: true, transaction, balance: newBalance };
+  return { success: true, transaction, balance: updatedAsset.balance };
 }
 
 /**
@@ -117,8 +118,9 @@ export async function consumeAsset(userId, assetTypeId, amount, description = ''
   if (!userAsset) throw new ForbiddenError(`用户${assetType.name}不足`);
   if (userAsset.balance < amount) throw new ForbiddenError(`${assetType.name}不足`);
 
-  const newBalance = userAsset.balance - amount;
-  await repo.update('user_assets', userAsset.id, { balance: newBalance, updatedAt: new Date().toISOString() });
+  await repo.increment('user_assets', userAsset.id, 'balance', -amount);
+  await repo.update('user_assets', userAsset.id, { updatedAt: new Date().toISOString() });
+  const updatedAsset = await repo.findById('user_assets', userAsset.id);
 
   const transaction = await repo.insert('asset_transactions', {
     id: generateId(),
@@ -129,15 +131,15 @@ export async function consumeAsset(userId, assetTypeId, amount, description = ''
     transactionType: 2,
     amount,
     balance: userAsset.balance,
-    balanceAfter: newBalance,
-    frozenAfter: userAsset.frozen,
+    balanceAfter: updatedAsset.balance,
+    frozenAfter: updatedAsset.frozen,
     relatedBizId,
     description: description || `${assetType.name}支出`,
     status: 1,
     createdAt: new Date().toISOString(),
   });
 
-  return { success: true, transaction, balance: newBalance };
+  return { success: true, transaction, balance: updatedAsset.balance };
 }
 
 /**

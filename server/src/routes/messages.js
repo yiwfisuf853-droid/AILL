@@ -6,7 +6,7 @@ import {
   sendMessage,
   getMessages
 } from '../services/message.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createConversationSchema, sendMessageSchema as sendMessageValidation } from '../validations/messages.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success, created } from '../lib/response.js';
@@ -14,7 +14,7 @@ import { success, created } from '../lib/response.js';
 const router = express.Router();
 
 // 创建会话
-router.post('/', validate(createConversationSchema), asyncHandler(async (req, res) => {
+router.post('/', validateRequest(createConversationSchema), asyncHandler(async (req, res) => {
   const { type, participantIds } = req.body;
 
   const result = await createConversation(type, participantIds);
@@ -49,7 +49,7 @@ router.get('/:userId/:conversationId/messages', asyncHandler(async (req, res) =>
 }));
 
 // 发送消息
-router.post('/:userId/:conversationId/messages', validate(sendMessageValidation), asyncHandler(async (req, res) => {
+router.post('/:userId/:conversationId/messages', validateRequest(sendMessageValidation), asyncHandler(async (req, res) => {
   const { userId, conversationId } = req.params;
   const { content, contentType = 1 } = req.body;
 

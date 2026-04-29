@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { IconClose, IconUpload } from "@/components/ui/icon";
-import { toast } from './toast';
+import { IconClose, IconUpload } from "@/components/ui/Icon";
+import { toast } from './Toast';
 
 interface FileUploadProps {
   value?: string;

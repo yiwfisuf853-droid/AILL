@@ -1,7 +1,12 @@
 import express from 'express';
 import { asyncHandler } from '../lib/errors.js';
-import { success } from '../lib/response.js';
+import { success, created } from '../lib/response.js';
 import * as repo from '../models/repository.js';
+import { generateId } from '../lib/id.js';
+import { createApiKey } from '../services/ai.service.js';
+import { validateRequest } from '../middleware/validate.js';
+import { getTrendsSchema, getActiveUsersSchema, createAiUserSchema } from '../validations/admin.js';
+import { z } from 'zod';
 
 const router = express.Router();
 
@@ -32,8 +37,8 @@ router.get('/stats/overview', asyncHandler(async (req, res) => {
 }));
 
 // 趋势数据（过去 N 天）
-router.get('/stats/trends', asyncHandler(async (req, res) => {
-  const days = parseInt(req.query.days) || 7;
+router.get('/stats/trends', validateRequest(getTrendsSchema), asyncHandler(async (req, res) => {
+  const days = req.query.days || 7;
 
   const res2 = await repo.rawQuery(`
     SELECT
@@ -48,8 +53,8 @@ router.get('/stats/trends', asyncHandler(async (req, res) => {
 }));
 
 // 活跃用户排行
-router.get('/stats/active-users', asyncHandler(async (req, res) => {
-  const limit = parseInt(req.query.limit) || 10;
+router.get('/stats/active-users', validateRequest(getActiveUsersSchema), asyncHandler(async (req, res) => {
+  const limit = req.query.limit || 10;
 
   const res2 = await repo.rawQuery(`
     SELECT u.*, password,
@@ -79,6 +84,66 @@ router.get('/stats/content-distribution', asyncHandler(async (req, res) => {
   const bySection = {};
   bySectionRes.rows.forEach(r => { bySection[r.section_id || 'uncategorized'] = Number(r.count); });
   success(res, { byType, bySection, totalPosts: Number(totalRes.rows[0].total) });
+}));
+
+// 管理员创建 AI 账号
+router.post('/ai-users', validateRequest(createAiUserSchema), asyncHandler(async (req, res) => {
+  const { username, capabilities } = req.body;
+
+  // 检查用户名是否已存在
+  const existing = await repo.rawQuery('SELECT id FROM users WHERE username = $1', [username]);
+  if (existing.rows.length > 0) {
+    return res.status(409).json({ success: false, error: '用户名已存在' });
+  }
+
+  // 创建 AI 用户（无密码，通过 API Key 认证）
+  const user = {
+    id: generateId(),
+    username,
+    email: `${username}@ai.aill.local`,
+    password: '', // 无密码，API Key 认证
+    avatar: null,
+    bio: 'AI 创作者',
+    isAi: true,
+    aiLikelihood: 1.0,
+    role: 'user',
+    followerCount: 0,
+    followingCount: 0,
+    postCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    deletedAt: null,
+  };
+
+  await repo.insert('users', user);
+
+  // 创建 AI 档案
+  await repo.insert('ai_profiles', {
+    id: generateId(),
+    userId: user.id,
+    capabilities: JSON.stringify(capabilities),
+    updatedAt: new Date().toISOString(),
+  });
+
+  // 自动生成 API Key
+  const keyResult = await createApiKey(user.id);
+
+  created(res, {
+    user: { id: user.id, username: user.username },
+    apiKey: keyResult.apiKey,
+  });
+}));
+
+// 生成 AI 激活邀请 Token
+router.post('/ai-tokens', asyncHandler(async (req, res) => {
+  const token = generateId();
+  const configKey = `ai_invite_${token}`;
+  const configValue = JSON.stringify({ used: false, createdAt: new Date().toISOString() });
+  await repo.rawQuery(
+    'INSERT INTO sys_config (id, config_key, config_value) VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM sys_config), $1, $2)',
+    [configKey, configValue]
+  );
+  created(res, { inviteToken: token });
 }));
 
 export default router;

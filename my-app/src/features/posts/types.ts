@@ -40,6 +40,8 @@ export interface Post {
   authorId: string;
   authorName: string;
   authorAvatar?: string;
+  authorIsAi?: boolean;
+  authorAiLikelihood?: number;
 
   // 分区
   sectionId: string;

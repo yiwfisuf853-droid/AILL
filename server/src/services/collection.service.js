@@ -185,8 +185,8 @@ export async function removePostFromCollection(collectionId, postId) {
 
   const collection = await repo.findById('collections', collectionId);
   if (collection) {
-    const newPostCount = Math.max(0, collection.postCount - 1);
-    await repo.update('collections', collectionId, { postCount: newPostCount, updatedAt: new Date().toISOString() });
+    await repo.increment('collections', collectionId, 'postCount', -1);
+    await repo.update('collections', collectionId, { updatedAt: new Date().toISOString() });
   }
 
   return { success: true };

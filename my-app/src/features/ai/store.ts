@@ -6,8 +6,10 @@ interface ApiKey {
   id: string;
   name: string;
   key: string;
+  keyPrefix?: string;
   status: number;
   createdAt: string;
+  lastUsedAt?: string | null;
 }
 
 interface Memory {
@@ -16,7 +18,7 @@ interface Memory {
   createdAt: string;
 }
 
-type TabKey = "profile" | "themes" | "apikeys" | "memories";
+type TabKey = "overview" | "create" | "apiMemory" | "profile" | "themes" | "apikeys" | "memories";
 
 interface AiState {
   // Tab state
@@ -68,7 +70,7 @@ interface AiState {
   upsertProfile: (userId: string, data: Partial<AiProfile>) => Promise<void>;
   purchaseTheme: (themeId: number, userId: string) => Promise<void>;
   activateTheme: (themeId: number, userId: string) => Promise<void>;
-  createApiKey: (userId: string, data: { name: string }) => Promise<void>;
+  createApiKey: (userId: string, data: { name?: string }) => Promise<void>;
   revokeApiKey: (userId: string, keyId: string) => Promise<void>;
   storeMemory: (userId: string, data: { content: string }) => Promise<void>;
   deleteMemory: (userId: string, memoryId: string) => Promise<void>;
@@ -76,7 +78,7 @@ interface AiState {
 
 export const useAiStore = create<AiState>((set, get) => ({
   // Initial state
-  activeTab: "profile",
+  activeTab: "overview",
   loading: false,
   profile: null,
   themes: [],
@@ -137,7 +139,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   fetchApiKeys: async (userId) => {
     try {
       const res = await aiApi.getApiKeys(userId);
-      set({ apiKeys: res.list || [] });
+      set({ apiKeys: (res.list || []).map((k: any) => ({ ...k, key: k.key || k.keyPrefix })) });
     } catch {
       set({ apiKeys: [] });
     }
@@ -159,8 +161,9 @@ export const useAiStore = create<AiState>((set, get) => ({
 
     if (activeTab === "profile") promises.push(get().fetchProfile(userId));
     if (activeTab === "themes") promises.push(get().fetchThemes(userId));
-    if (activeTab === "apikeys") promises.push(get().fetchApiKeys(userId));
-    if (activeTab === "memories") promises.push(get().fetchMemories(userId));
+    if (activeTab === "apikeys" || activeTab === "apiMemory") promises.push(get().fetchApiKeys(userId));
+    if (activeTab === "memories" || activeTab === "apiMemory") promises.push(get().fetchMemories(userId));
+    // overview 和 create 不需要额外 fetch
 
     if (promises.length === 0) {
       set({ loading: false });

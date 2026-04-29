@@ -1,15 +1,15 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { useAuthStore } from "@/features/auth/store";
 import { useNotificationStore } from "@/features/notifications/store";
 import { useMessageStore } from "@/features/messages/store";
 import {
   IconUser, IconLogout, IconMenu, IconClose,
   IconSearch, IconNotification, IconPlus, IconMail, IconSun, IconMoon
-} from "@/components/ui/icon";
+} from "@/components/ui/Icon";
 import { useState, useRef, useEffect } from "react";
-import { useTheme } from "@/lib/useTheme";
-import { NAV_LINKS, MODULE_HSL } from "@/lib/nav-config";
+import { useTheme } from "@/hooks/useTheme";
+import { NAV_LINKS, MODULE_HSL } from "@/lib/navConfig";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -60,7 +60,7 @@ export function Header() {
   return (
     <header
       data-name="header"
-      className="sticky top-0 z-50 w-full border-b border-border/60 glass transition-all duration-300"
+      className="sticky top-0 z-50 w-full border-b border-border/60 effectGlass transition-all duration-300"
       style={{
         borderBottomColor: `hsl(${activeHsl} / 0.15)`,
       }}
@@ -68,9 +68,9 @@ export function Header() {
       <div className="container-app">
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
-          <Link to="/" data-name="header.logo" className="flex items-center gap-2.5 shrink-0 group">
+          <Link to="/" data-name="headerLogo" className="flex items-center gap-2.5 shrink-0 group">
             <div
-              data-name="header.logoIcon"
+              data-name="headerLogoIcon"
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-300"
               style={{
                 background: `hsl(${activeHsl} / 0.15)`,
@@ -78,14 +78,14 @@ export function Header() {
               }}
             >
               <span
-                data-name="header.logoLetter"
+                data-name="headerLogoLetter"
                 className="text-sm font-bold transition-colors duration-300"
                 style={{ color: `hsl(${activeHsl})` }}
               >
                 A
               </span>
             </div>
-            <span data-name="header.brand" className="text-lg font-bold tracking-tight">
+            <span data-name="headerBrand" className="text-lg font-bold tracking-tight">
               <span className="text-foreground">AI</span>
               <span
                 className="transition-colors duration-300"
@@ -93,12 +93,12 @@ export function Header() {
               >
                 LL
               </span>
-              <span data-name="header.brandSlogan" className="text-[10px] font-normal text-foreground-tertiary ml-1.5 hidden sm:inline">AI与人类共创</span>
+              <span data-name="headerBrandSlogan" className="text-xs font-normal text-foreground-tertiary ml-1.5 hidden sm:inline">AI与人类共创</span>
             </span>
           </Link>
 
           {/* Desktop Nav */}
-          <nav data-name="header.desktopNav" className="hidden lg:flex items-center gap-0.5">
+          <nav data-name="headerDesktopNav" className="hidden lg:flex items-center gap-0.5">
             {NAV_LINKS.map((link) => {
               const Icon = link.icon;
               const active = isActive(link.href);
@@ -107,7 +107,7 @@ export function Header() {
                 <Link
                   key={link.href}
                   to={link.href}
-                  data-name={`header.nav.${link.module}${active ? '.active' : ''}`}
+                  data-name={`headerNav${link.module}${active ? 'Active' : ''}`}
                   className="relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all duration-200"
                   style={
                     active
@@ -144,14 +144,14 @@ export function Header() {
           </nav>
 
           {/* Right actions */}
-          <div data-name="header.actions" className="flex items-center gap-2">
+          <div data-name="headerActions" className="flex items-center gap-2">
             {/* Search (desktop) */}
-            <div data-name="header.search" className="relative hidden md:flex">
+            <div data-name="headerSearch" className="relative hidden md:flex">
               {searchOpen ? (
                 <div className="flex items-center gap-2">
                   <input
                     ref={searchRef}
-                    data-name="header.searchInput"
+                    data-name="headerSearchInput"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     onKeyDown={e => {
@@ -166,19 +166,19 @@ export function Header() {
                     className="w-48 rounded-lg border border-border bg-background-elevated px-3 py-1.5 text-xs text-foreground placeholder:text-foreground-tertiary focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
                     autoFocus
                   />
-                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} data-name="header.searchCloseBtn" className="text-foreground-tertiary hover:text-foreground">
+                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} data-name="headerSearchCloseBtn" className="text-foreground-tertiary hover:text-foreground">
                     <IconClose size={14} />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setSearchOpen(true)}
-                  data-name="header.searchTrigger"
+                  data-name="headerSearchTrigger"
                   className="flex items-center gap-2 rounded-lg border border-border bg-background-elevated px-3 py-1.5 text-foreground-tertiary hover:border-border-hover transition-colors"
                 >
                   <IconSearch size={14} />
                   <span className="text-xs">搜索...</span>
-                  <kbd data-name="header.searchShortcut" className="hidden sm:inline-flex items-center rounded border border-border px-1 py-0.5 text-[10px] text-foreground-tertiary">
+                  <kbd data-name="headerSearchShortcut" className="hidden sm:inline-flex items-center rounded border border-border px-1 py-0.5 text-xs text-foreground-tertiary">
                     ⌘K
                   </kbd>
                 </button>
@@ -188,7 +188,7 @@ export function Header() {
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              data-name="header.themeToggle"
+              data-name="headerThemeToggle"
               className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:text-foreground hover:bg-muted transition-colors"
               title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
             >
@@ -197,25 +197,25 @@ export function Header() {
 
             {isAuthenticated && user ? (
               <>
-                <Link to="/notifications" data-name="header.notifications" className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:bg-muted hover:text-foreground transition-colors relative">
+                <Link to="/notifications" data-name="headerNotifications" className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:bg-muted hover:text-foreground transition-colors relative">
                   <IconNotification size={14} />
                   {unreadCount > 0 && (
-                    <span data-name="header.notifications.badge" className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background">
+                    <span data-name="headerNotificationsBadge" className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold px-1 ring-2 ring-background">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </Link>
-                <Link to="/messages" data-name="header.messages" className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:bg-muted hover:text-foreground transition-colors relative">
+                <Link to="/messages" data-name="headerMessages" className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:bg-muted hover:text-foreground transition-colors relative">
                   <IconMail size={14} />
                   {unreadMessages > 0 && (
-                    <span data-name="header.messages.badge" className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background">
+                    <span data-name="headerMessagesBadge" className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold px-1 ring-2 ring-background">
                       {unreadMessages > 99 ? '99+' : unreadMessages}
                     </span>
                   )}
                 </Link>
                 <Link
                   to="/posts/create"
-                  data-name="header.createPostBtn"
+                  data-name="headerCreatePostBtn"
                   className="hidden md:flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-all duration-200 hover:shadow-lg"
                   style={{
                     background: `hsl(${activeHsl})`,
@@ -227,11 +227,11 @@ export function Header() {
                 </Link>
                 <Link
                   to={`/users/${user.id}`}
-                  data-name="header.userAvatar"
+                  data-name="headerUserAvatar"
                   className="flex items-center gap-2"
                 >
                   <div
-                    data-name="header.avatar"
+                    data-name="headerAvatar"
                     style={{
                       background: `hsl(${activeHsl} / 0.15)`,
                       borderColor: `hsl(${activeHsl} / 0.3)`,
@@ -247,16 +247,16 @@ export function Header() {
                 </Link>
               </>
             ) : (
-              <div data-name="header.auth" className="hidden md:flex items-center gap-2">
+              <div data-name="headerAuth" className="hidden md:flex items-center gap-2">
                 <Link to="/auth/login">
-                  <Button variant="ghost" size="sm" data-name="header.loginBtn" className="text-foreground-secondary hover:text-foreground text-xs">
+                  <Button variant="ghost" size="sm" data-name="headerLoginBtn" className="text-foreground-secondary hover:text-foreground text-xs">
                     登录
                   </Button>
                 </Link>
                 <Link to="/auth/register">
                   <Button
                     size="sm"
-                    data-name="header.registerBtn"
+                    data-name="headerRegisterBtn"
                     className="text-xs h-8 px-4 text-white"
                     style={{
                       background: `hsl(${activeHsl})`,
@@ -270,7 +270,7 @@ export function Header() {
 
             {/* Mobile toggle */}
             <button
-              data-name="header.mobileMenuBtn"
+              data-name="headerMobileMenuBtn"
               className="lg:hidden flex items-center justify-center h-8 w-8 rounded-lg text-foreground-secondary hover:text-foreground hover:bg-muted transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
@@ -281,7 +281,7 @@ export function Header() {
 
         {/* Mobile Menu */}
         <div
-          data-name="header.mobileMenu"
+          data-name="headerMobileMenu"
           className="lg:hidden overflow-hidden transition-all duration-300 ease-out border-t border-border/60"
           style={{
             maxHeight: mobileOpen ? '600px' : '0px',
@@ -318,10 +318,10 @@ export function Header() {
                 </Link>
               );
             })}
-            <div className="border-t border-border/60 pt-3 mt-3">
+            <div className="border-t border-border/60 pt-3 mt-3" data-name="headerMobileSecondary">
               <button
                 onClick={() => { toggleTheme(); }}
-                data-name="header.mobileThemeToggle"
+                data-name="headerMobileThemeToggle"
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary w-full"
               >
                 {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
@@ -332,7 +332,7 @@ export function Header() {
                   <Link
                     to="/posts/create"
                     onClick={() => setMobileOpen(false)}
-                    data-name="header.mobileCreatePostBtn"
+                    data-name="headerMobileCreatePostBtn"
                     className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium"
                     style={{ color: `hsl(${activeHsl})` }}
                   >
@@ -342,7 +342,7 @@ export function Header() {
                   <Link
                     to="/notifications"
                     onClick={() => setMobileOpen(false)}
-                    data-name="header.mobileNotifications"
+                    data-name="headerMobileNotifications"
                     className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary relative"
                   >
                     <div className="relative">
@@ -358,7 +358,7 @@ export function Header() {
                   <Link
                     to="/messages"
                     onClick={() => setMobileOpen(false)}
-                    data-name="header.mobileMessages"
+                    data-name="headerMobileMessages"
                     className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary relative"
                   >
                     <div className="relative">
@@ -374,7 +374,7 @@ export function Header() {
                   <Link
                     to={`/users/${user.id}`}
                     onClick={() => setMobileOpen(false)}
-                    data-name="header.mobileProfile"
+                    data-name="headerMobileProfile"
                     className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary"
                   >
                     <IconUser size={16} />
@@ -382,7 +382,7 @@ export function Header() {
                   </Link>
                   <button
                     onClick={() => { handleLogout(); setMobileOpen(false); }}
-                    data-name="header.mobileLogoutBtn"
+                    data-name="headerMobileLogoutBtn"
                     className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive w-full"
                   >
                     <IconLogout size={16} />
@@ -390,12 +390,12 @@ export function Header() {
                   </button>
                 </div>
               ) : (
-                <div data-name="header.mobileAuth" className="flex gap-2 px-3">
+                <div data-name="headerMobileAuth" className="flex gap-2 px-3">
                   <Link to="/auth/login" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button variant="outline" size="sm" data-name="header.mobileLoginBtn" className="w-full text-xs">登录</Button>
+                    <Button variant="outline" size="sm" data-name="headerMobileLoginBtn" className="w-full text-xs">登录</Button>
                   </Link>
                   <Link to="/auth/register" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button size="sm" data-name="header.mobileRegisterBtn" className="w-full text-xs text-white" style={{ background: `hsl(${activeHsl})` }}>注册</Button>
+                    <Button size="sm" data-name="headerMobileRegisterBtn" className="w-full text-xs text-white" style={{ background: `hsl(${activeHsl})` }}>注册</Button>
                   </Link>
                 </div>
               )}

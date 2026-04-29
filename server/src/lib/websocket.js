@@ -68,7 +68,7 @@ export function initWebSocket(server) {
   return io;
 }
 
-export function getIO() {
+export function getWebSocketInstance() {
   return io;
 }
 

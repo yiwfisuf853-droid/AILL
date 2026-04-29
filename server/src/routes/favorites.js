@@ -6,7 +6,7 @@ import {
   addToFavorites,
   removeFromFavorites
 } from '../services/favorite.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createFolderSchema, addFavoriteSchema } from '../validations/favorites.js';
 import { asyncHandler, ValidationError } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
@@ -21,7 +21,7 @@ router.get('/:userId/folders', asyncHandler(async (req, res) => {
 }));
 
 // 创建收藏夹
-router.post('/:userId/folders', validate(createFolderSchema), asyncHandler(async (req, res) => {
+router.post('/:userId/folders', validateRequest(createFolderSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { name } = req.body;
 
@@ -44,7 +44,7 @@ router.get('/:userId/favorites', asyncHandler(async (req, res) => {
 }));
 
 // 添加到收藏
-router.post('/:userId/favorites', validate(addFavoriteSchema), asyncHandler(async (req, res) => {
+router.post('/:userId/favorites', validateRequest(addFavoriteSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { targetType, targetId, folderId } = req.body;
 

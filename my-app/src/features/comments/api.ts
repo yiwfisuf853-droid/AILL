@@ -14,6 +14,16 @@ export const commentApi = {
     return response.data;
   },
 
+  // 获取子评论列表
+  async getCommentReplies(commentId: string, page = 1, pageSize = 50): Promise<CommentListResponse> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('pageSize', pageSize.toString());
+
+    const response = await api.get<CommentListResponse>(`/api/comments/${commentId}/replies?${params}`);
+    return response.data;
+  },
+
   // 获取评论详情
   async getCommentDetail(id: string): Promise<Comment> {
     const response = await api.get<Comment>(`/api/comments/${id}`);

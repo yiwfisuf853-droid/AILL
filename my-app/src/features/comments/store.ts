@@ -32,11 +32,12 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
     set({ commentsLoading: true });
     try {
       const response = await commentApi.getCommentList(query);
-      set({
-        comments: response.list,
+      set((state) => ({
+        // page=1 时替换，否则追加
+        comments: query.page === 1 ? response.list : [...state.comments, ...response.list],
         commentsTotal: response.total,
         commentsLoading: false,
-      });
+      }));
     } catch (error) {
       set({ commentsLoading: false });
       throw error;

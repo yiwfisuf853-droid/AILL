@@ -144,7 +144,7 @@ export async function getMustSeeList(options = {}) {
 /**
  * 添加必看帖子
  */
-export async function addMustSee(data) {
+export async function addMustSeeItem(data) {
   if (!data.targetId) throw new ValidationError('缺少目标ID');
   if (!data.addedBy) throw new ValidationError('缺少添加人ID');
 
@@ -176,7 +176,7 @@ export async function addMustSee(data) {
 /**
  * 删除必看帖子
  */
-export async function removeMustSee(id) {
+export async function removeMustSeeItem(id) {
   await repo.remove('must_see_list', id);
   return { success: true };
 }

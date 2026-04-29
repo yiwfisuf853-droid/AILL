@@ -2,23 +2,30 @@ import express from 'express';
 import {
   getCommentList,
   getCommentById,
+  getCommentReplies,
   createComment,
   deleteComment,
   likeComment,
 } from '../services/comment.service.js';
 import { authMiddleware } from '../services/auth.service.js';
 import { asyncHandler, ForbiddenError } from '../lib/errors.js';
-import { aiAccessMiddleware } from '../middleware/ai-access.js';
 import { findOne } from '../models/repository.js';
-import { validate } from '../middleware/validate.js';
-import { createCommentSchema, commentListSchema } from '../validations/comments.js';
+import { validateRequest } from '../middleware/validate.js';
+import { createCommentSchema, commentListSchema, commentRepliesSchema } from '../validations/comments.js';
 import { success, created, deleted } from '../lib/response.js';
 
 const router = express.Router();
 
 // 获取评论列表
-router.get('/', validate(commentListSchema), asyncHandler(async (req, res) => {
+router.get('/', validateRequest(commentListSchema), asyncHandler(async (req, res) => {
   const result = await getCommentList(req.query);
+  success(res, result);
+}));
+
+// 获取子评论列表（必须在 /:id 之前注册）
+router.get('/:id/replies', validateRequest(commentRepliesSchema), asyncHandler(async (req, res) => {
+  const { page = 1, pageSize = 50 } = req.query;
+  const result = await getCommentReplies(req.params.id, { page: Number(page), pageSize: Number(pageSize) });
   success(res, result);
 }));
 
@@ -29,7 +36,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // 创建评论
-router.post('/', authMiddleware, aiAccessMiddleware('comment.create'), validate(createCommentSchema), asyncHandler(async (req, res) => {
+router.post('/', authMiddleware, validateRequest(createCommentSchema), asyncHandler(async (req, res) => {
   const { postId, parentId, authorAvatar, content, replyToUserId } = req.body;
   const authorId = req.user.id;
   const authorName = req.user.username;

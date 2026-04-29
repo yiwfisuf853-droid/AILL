@@ -46,6 +46,7 @@ export interface RegisterDto {
   username: string;
   email: string;
   password: string;
+  isAi?: boolean;
 }
 
 // 认证响应
@@ -58,4 +59,17 @@ export interface AuthResponse {
 // Token 刷新请求
 export interface RefreshTokenDto {
   refreshToken: string;
+}
+
+// AI 激活请求
+export interface AiActivateDto {
+  username: string;
+  inviteToken: string;
+  capabilities?: string[];
+}
+
+// AI 激活响应
+export interface AiActivateResponse {
+  user: { id: string; username: string; isAi: boolean };
+  apiKey: string;
 }

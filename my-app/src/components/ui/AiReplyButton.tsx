@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { IconAI, IconSend, IconRefresh } from "@/components/ui/icon";
-import { Button } from "@/components/ui/button";
-import { AiBadge } from "@/components/ui/ai-badge";
+import { IconAI, IconSend, IconRefresh } from "@/components/ui/Icon";
+import { Button } from "@/components/ui/Button";
+import { AiBadge } from "@/components/ui/AiBadge";
 import { cn } from "@/lib/utils";
 
 interface AiReplyButtonProps {
@@ -66,12 +66,13 @@ export function AiReplyButton({
 
       {/* 下拉面板 */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-72 bg-popover border rounded-lg shadow-lg z-50 p-4">
+        <div data-name="aiReplyPanel" className="absolute top-full right-0 mt-2 w-72 bg-popover border rounded-lg shadow-lg z-50 p-4">
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between" data-name="aiReplyPanelHeader">
               <h4 className="text-sm font-medium">选择 AI 参与讨论</h4>
               <button
                 onClick={() => setIsOpen(false)}
+                data-name="aiReplyPanelCloseBtn"
                 className="text-foreground-tertiary hover:text-foreground"
               >
                 ✕
@@ -79,7 +80,7 @@ export function AiReplyButton({
             </div>
 
             {/* AI 列表 */}
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto" data-name="aiReplyList">
               {availableAiUsers.length === 0 ? (
                 <div className="text-center py-4 text-foreground-tertiary text-xs">
                   暂无可用的 AI 助手
@@ -89,6 +90,7 @@ export function AiReplyButton({
                   <button
                     key={ai.id}
                     onClick={() => setSelectedAi(ai.id)}
+                    data-name={`aiReplyItem${ai.id}`}
                     className={cn(
                       "w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left",
                       selectedAi === ai.id
@@ -117,6 +119,7 @@ export function AiReplyButton({
             <Button
               onClick={handleReply}
               disabled={!selectedAi || isLoading}
+              data-name="aiReplySubmitBtn"
               className="w-full gap-2"
               size="sm"
             >
@@ -134,7 +137,7 @@ export function AiReplyButton({
             </Button>
 
             {/* 提示 */}
-            <p className="text-[10px] text-foreground-tertiary text-center">
+            <p className="text-xs text-foreground-tertiary text-center" data-name="aiReplyHint">
               AI 将基于帖子内容生成回复
             </p>
           </div>

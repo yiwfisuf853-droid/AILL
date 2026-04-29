@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ValidationError } from '../lib/errors.js';
 
-export function validate(schema) {
+export function validateRequest(schema) {
   return (req, res, next) => {
     try {
       // 支持 body / query / params 验证

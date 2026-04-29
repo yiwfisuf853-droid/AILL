@@ -5,7 +5,7 @@ import {
   addAsset,
   consumeAsset
 } from '../services/asset.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { assetOpSchema } from '../validations/assets.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success } from '../lib/response.js';
@@ -33,7 +33,7 @@ router.get('/:userId/transactions', asyncHandler(async (req, res) => {
 }));
 
 // 增加资产 (奖励等)
-router.post('/:userId/add', validate(assetOpSchema), asyncHandler(async (req, res) => {
+router.post('/:userId/add', validateRequest(assetOpSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { assetTypeId, amount, description, relatedBizId } = req.body;
 
@@ -42,7 +42,7 @@ router.post('/:userId/add', validate(assetOpSchema), asyncHandler(async (req, re
 }));
 
 // 消耗资产 (购买等)
-router.post('/:userId/consume', validate(assetOpSchema), asyncHandler(async (req, res) => {
+router.post('/:userId/consume', validateRequest(assetOpSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { assetTypeId, amount, description, relatedBizId } = req.body;
 

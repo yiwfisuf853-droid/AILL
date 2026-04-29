@@ -6,12 +6,12 @@ import {
   createDictItem,
   updateDictItem
 } from '../services/dict.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { createDictTypeSchema, createDictItemSchema } from '../validations/dict.js';
 import { asyncHandler, ForbiddenError } from '../lib/errors.js';
 import { success, created } from '../lib/response.js';
 
-const requireAdmin = (req, res, next) => {
+const requireAdminMiddleware = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') throw new ForbiddenError('需要管理员权限');
   next();
 };
@@ -25,7 +25,7 @@ router.get('/types', asyncHandler(async (req, res) => {
 }));
 
 // 创建字典类型（管理员）
-router.post('/types', requireAdmin, validate(createDictTypeSchema), asyncHandler(async (req, res) => {
+router.post('/types', requireAdminMiddleware, validateRequest(createDictTypeSchema), asyncHandler(async (req, res) => {
   const { typeCode, typeName, description } = req.body;
 
   const result = await createDictType({ typeCode, typeName, description });
@@ -40,7 +40,7 @@ router.get('/types/:typeId/items', asyncHandler(async (req, res) => {
 }));
 
 // 创建字典项（管理员）
-router.post('/types/:typeId/items', requireAdmin, validate(createDictItemSchema), asyncHandler(async (req, res) => {
+router.post('/types/:typeId/items', requireAdminMiddleware, validateRequest(createDictItemSchema), asyncHandler(async (req, res) => {
   const { typeId } = req.params;
   const { itemKey, itemValue, extra, sortOrder, isDefault } = req.body;
 
@@ -55,7 +55,7 @@ router.post('/types/:typeId/items', requireAdmin, validate(createDictItemSchema)
 }));
 
 // 更新字典项（管理员）
-router.patch('/items/:id', requireAdmin, asyncHandler(async (req, res) => {
+router.patch('/items/:id', requireAdminMiddleware, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 

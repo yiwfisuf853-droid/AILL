@@ -24,7 +24,7 @@ export async function createFeedback(data) {
 /**
  * 获取反馈列表
  */
-export async function getFeedbacks(userId, options = {}) {
+export async function getFeedbackList(userId, options = {}) {
   const { page = 1, limit = 20 } = options;
 
   const result = await repo.findAll('feedbacks', {

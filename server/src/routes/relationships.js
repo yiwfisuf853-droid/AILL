@@ -9,7 +9,7 @@ import {
   unblockUser,
   getBlockedUsers
 } from '../services/relationship.service.js';
-import { validate } from '../middleware/validate.js';
+import { validateRequest } from '../middleware/validate.js';
 import { followParamSchema, userParamSchema, relationshipCheckSchema } from '../validations/relationships.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success, created } from '../lib/response.js';
@@ -17,7 +17,7 @@ import { success, created } from '../lib/response.js';
 const router = express.Router();
 
 // 关注用户
-router.post('/follow/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+router.post('/follow/:targetUserId', validateRequest(followParamSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { targetUserId } = req.params;
 
@@ -26,7 +26,7 @@ router.post('/follow/:targetUserId', validate(followParamSchema), asyncHandler(a
 }));
 
 // 取消关注
-router.post('/unfollow/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+router.post('/unfollow/:targetUserId', validateRequest(followParamSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { targetUserId } = req.params;
 
@@ -35,28 +35,28 @@ router.post('/unfollow/:targetUserId', validate(followParamSchema), asyncHandler
 }));
 
 // 获取粉丝列表
-router.get('/:userId/followers', validate(userParamSchema), asyncHandler(async (req, res) => {
+router.get('/:userId/followers', validateRequest(userParamSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const result = await getFollowers(userId);
   success(res, result);
 }));
 
 // 获取关注列表
-router.get('/:userId/following', validate(userParamSchema), asyncHandler(async (req, res) => {
+router.get('/:userId/following', validateRequest(userParamSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const result = await getFollowing(userId);
   success(res, result);
 }));
 
 // 检查关系状态
-router.get('/:userId/relationship/:targetUserId', validate(relationshipCheckSchema), asyncHandler(async (req, res) => {
+router.get('/:userId/relationship/:targetUserId', validateRequest(relationshipCheckSchema), asyncHandler(async (req, res) => {
   const { userId, targetUserId } = req.params;
   const result = await checkRelationship(userId, targetUserId);
   success(res, result);
 }));
 
 // 拉黑用户
-router.post('/block/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+router.post('/block/:targetUserId', validateRequest(followParamSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { targetUserId } = req.params;
 
@@ -65,7 +65,7 @@ router.post('/block/:targetUserId', validate(followParamSchema), asyncHandler(as
 }));
 
 // 取消拉黑
-router.post('/unblock/:targetUserId', validate(followParamSchema), asyncHandler(async (req, res) => {
+router.post('/unblock/:targetUserId', validateRequest(followParamSchema), asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { targetUserId } = req.params;
 
@@ -74,7 +74,7 @@ router.post('/unblock/:targetUserId', validate(followParamSchema), asyncHandler(
 }));
 
 // 获取拉黑列表
-router.get('/:userId/blocks', validate(userParamSchema), asyncHandler(async (req, res) => {
+router.get('/:userId/blocks', validateRequest(userParamSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const result = await getBlockedUsers(userId);
   success(res, result);

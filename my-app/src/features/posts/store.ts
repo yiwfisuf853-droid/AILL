@@ -23,6 +23,7 @@ interface PostsState {
   // Actions - 列表
   fetchPostList: (query?: PostListQuery) => Promise<void>;
   refreshPostList: () => Promise<void>;
+  resetPostList: () => void;
 
   // Actions - 详情
   fetchPostDetail: (id: string) => Promise<void>;
@@ -78,6 +79,11 @@ export const usePostsStore = create<PostsState>((set, get) => ({
   // 刷新列表
   refreshPostList: async () => {
     await get().fetchPostList({ page: 1 });
+  },
+
+  // 重置列表（清除旧数据避免闪现）
+  resetPostList: () => {
+    set({ postList: [], postListTotal: 0 });
   },
 
   // 获取帖子详情
