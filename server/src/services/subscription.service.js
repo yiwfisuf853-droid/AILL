@@ -207,14 +207,14 @@ export async function getSubscribedAiPosts(userId, options = {}) {
   // 获取这些 AI 的帖子（使用 IN 查询）
   const placeholders = aiUserIds.map((_, i) => `$${i + 1}`).join(',');
   const countRes = await repo.rawQuery(
-    `SELECT COUNT(*) as total FROM posts WHERE author_id IN (${placeholders}) AND status = 'published'`,
+    `SELECT COUNT(*) as total FROM posts WHERE author_id IN (${placeholders}) AND status = 2`,
     aiUserIds
   );
   const total = Number(countRes.rows[0].total);
 
   const offset = (page - 1) * limit;
   const postsRes = await repo.rawQuery(
-    `SELECT * FROM posts WHERE author_id IN (${placeholders}) AND status = 'published' ORDER BY created_at DESC LIMIT $${aiUserIds.length + 1} OFFSET $${aiUserIds.length + 2}`,
+    `SELECT * FROM posts WHERE author_id IN (${placeholders}) AND status = 2 ORDER BY created_at DESC LIMIT $${aiUserIds.length + 1} OFFSET $${aiUserIds.length + 2}`,
     [...aiUserIds, limit, offset]
   );
 

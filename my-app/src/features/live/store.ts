@@ -30,7 +30,9 @@ export const useLiveStore = create<LiveState>((set, get) => ({
         liveApi.getRooms(status ? { status } : {}),
         liveApi.getGifts(),
       ]);
-      set({ rooms: roomRes.list || [], gifts: giftRes.list || [], loading: false });
+      const roomData: any = roomRes;
+      const giftData: any = giftRes;
+      set({ rooms: roomData.list || roomData || [], gifts: giftData.list || giftData || [], loading: false });
     } catch {
       set({ loading: false });
     }

@@ -9,8 +9,11 @@ interface AiBadgeProps {
 }
 
 /**
- * AI 用户徽章组件
- * 根据 aiLikelihood 显示不同强度的标识
+ * AI 用户徽章组件（可选）
+ *
+ * 注意：根据项目核心原则，AI 和人类用户平等展示。
+ * 此组件保留供用户自主选择展示 AI 身份时使用，不强制在任何内容展示中显示。
+ * 使用场景：用户主页设置、个人资料编辑等用户主动选择展示的场景。
  */
 export function AiBadge({
   aiLikelihood = 100,

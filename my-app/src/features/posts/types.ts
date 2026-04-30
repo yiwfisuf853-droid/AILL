@@ -99,6 +99,8 @@ export interface PostUpdateDto {
   tags?: string[];
   sectionId?: string;
   subSectionId?: string;
+  type?: PostType;
+  status?: PostStatus;
 }
 
 export interface PostListQuery {
@@ -110,6 +112,7 @@ export interface PostListQuery {
   tag?: string;
   authorId?: string;
   keyword?: string;
+  status?: number;
 }
 
 export interface PostListResponse {
@@ -166,4 +169,18 @@ export interface LivePost extends Post {
   liveStatus: 'pending' | 'live' | 'ended';
   viewerCount: number;
   liveUrl?: string;
+}
+
+// 编辑历史条目
+export interface EditHistoryItem {
+  id: string;
+  postId: string;
+  editorId: string;
+  editorName?: string;
+  titleBefore?: string;
+  titleAfter?: string;
+  contentBefore?: string;
+  contentAfter?: string;
+  reason?: string;
+  createdAt: string;
 }

@@ -7,6 +7,7 @@ import { createApiKey } from '../services/ai.service.js';
 import { validateRequest } from '../middleware/validate.js';
 import { getTrendsSchema, getActiveUsersSchema, createAiUserSchema } from '../validations/admin.js';
 import { z } from 'zod';
+import { getUserActionStats } from '../services/action-trace.service.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/stats/overview', asyncHandler(async (req, res) => {
     repo.rawQuery("SELECT COUNT(*) as total FROM comments WHERE created_at::date::text = $1", [today]),
     repo.rawQuery("SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL AND created_at::text LIKE $1", [thisMonth + '%']),
     repo.rawQuery("SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL AND created_at::text LIKE $1", [thisMonth + '%']),
-    repo.rawQuery("SELECT COUNT(*) as total FROM moderation_records WHERE status = 'pending'"),
+    repo.rawQuery("SELECT COUNT(*) as total FROM moderation_records WHERE status = 1"),
   ]);
 
   success(res, {
@@ -57,18 +58,15 @@ router.get('/stats/active-users', validateRequest(getActiveUsersSchema), asyncHa
   const limit = req.query.limit || 10;
 
   const res2 = await repo.rawQuery(`
-    SELECT u.*, password,
-      COALESCE((SELECT COUNT(*) FROM posts WHERE author_id = u.id AND deleted_at IS NULL), 0) AS post_count,
+    SELECT u.id, u.username, u.avatar, u.role, u.is_ai, u.follower_count, u.following_count, u.post_count, u.created_at,
+      COALESCE((SELECT COUNT(*) FROM posts WHERE author_id = u.id AND deleted_at IS NULL), 0) AS post_count_calc,
       COALESCE((SELECT COUNT(*) FROM comments WHERE author_id = u.id), 0) AS comment_count,
       COALESCE((SELECT COUNT(*) FROM posts WHERE author_id = u.id AND deleted_at IS NULL), 0) * 3 +
       COALESCE((SELECT COUNT(*) FROM comments WHERE author_id = u.id), 0) AS activity_score
     FROM users u WHERE deleted_at IS NULL
     ORDER BY activity_score DESC LIMIT $1
   `, [limit]);
-  const list = res2.rows.map(u => {
-    const { password, ...safe } = repo.toCamelCase(u);
-    return safe;
-  });
+  const list = res2.rows.map(u => repo.toCamelCase(u));
   success(res, { list });
 }));
 
@@ -132,6 +130,46 @@ router.post('/ai-users', validateRequest(createAiUserSchema), asyncHandler(async
     user: { id: user.id, username: user.username },
     apiKey: keyResult.apiKey,
   });
+}));
+
+// API 审计日志查询
+router.get('/api-audit-logs', asyncHandler(async (req, res) => {
+  const { userId, actionType, days = 7, page = 1, limit = 50 } = req.query;
+  const since = new Date(Date.now() - Number(days) * 86400000).toISOString();
+
+  let whereClause = 'WHERE created_at >= $1';
+  const params = [since];
+  let idx = 2;
+
+  if (userId) {
+    whereClause += ` AND user_id = $${idx++}`;
+    params.push(userId);
+  }
+  if (actionType) {
+    whereClause += ` AND action_type = $${idx++}`;
+    params.push(Number(actionType));
+  }
+
+  const countRes = await repo.rawQuery(
+    `SELECT COUNT(*) as total FROM user_action_traces ${whereClause}`,
+    params
+  );
+  const total = Number(countRes.rows[0].total);
+
+  const offset = (Number(page) - 1) * Number(limit);
+  params.push(Number(limit), offset);
+  const res2 = await repo.rawQuery(
+    `SELECT * FROM user_action_traces ${whereClause} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx}`,
+    params
+  );
+
+  const list = res2.rows.map(r => {
+    const row = repo.toCamelCase(r);
+    // 关联用户名
+    return row;
+  });
+
+  success(res, { list, total, page: Number(page), limit: Number(limit) });
 }));
 
 // 生成 AI 激活邀请 Token

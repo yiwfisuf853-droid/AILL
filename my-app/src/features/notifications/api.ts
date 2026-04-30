@@ -27,8 +27,8 @@ export const notificationApi = {
     if (params.limit) query.append('limit', params.limit.toString());
     if (params.isRead !== undefined) query.append('isRead', params.isRead.toString());
     if (params.type !== undefined) query.append('type', params.type.toString());
-    const res = await api.get(`/api/notifications/${userId}?${query}`);
-    return res.data;
+    const res = await api.get<{ success: boolean; data: NotificationListResponse }>(`/api/notifications/${userId}?${query}`);
+    return res.data.data;
   },
 
   async markAsRead(id: string): Promise<void> {

@@ -15,6 +15,7 @@ export async function getPostList(options = {}) {
     tag,
     authorId,
     keyword,
+    status,
   } = options;
 
   let whereClause = 'WHERE p.deleted_at IS NULL';
@@ -29,6 +30,8 @@ export async function getPostList(options = {}) {
     whereClause += ` AND (p.title ILIKE $${idx++} OR p.content ILIKE $${idx++})`;
     params.push(`%${keyword}%`, `%${keyword}%`);
   }
+  if (status) { whereClause += ` AND p.status = $${idx++}`; params.push(status); }
+  else { whereClause += ` AND p.status = 2`; }
 
   const orderBy = sortBy === 'latest'
     ? 'p.created_at DESC'
@@ -55,10 +58,10 @@ export async function getFollowingPosts(userId, options = {}) {
 
   // 获取用户关注的用户 ID 列表
   const followRes = await repo.rawQuery(
-    `SELECT target_id FROM user_relationships WHERE user_id = $1 AND type = 1 AND (deleted IS NOT TRUE) AND (deleted_at IS NULL)`,
+    `SELECT target_user_id FROM user_relationships WHERE user_id = $1 AND type = 1 AND status = 1 AND deleted_at IS NULL`,
     [userId]
   );
-  const followingIds = followRes.rows.map(r => r.target_id);
+  const followingIds = followRes.rows.map(r => r.target_user_id);
 
   if (followingIds.length === 0) {
     return { list: [], total: 0, page, pageSize, hasMore: false };
@@ -82,7 +85,7 @@ export async function getFollowingPosts(userId, options = {}) {
 
 // 获取热门帖子
 export async function getHotPosts(sectionId, limit = 10) {
-  let whereClause = 'WHERE p.deleted_at IS NULL AND p.is_hot = true';
+  let whereClause = 'WHERE p.deleted_at IS NULL AND p.is_hot = 1';
   const params = [];
   let idx = 1;
 
@@ -98,10 +101,14 @@ export async function getHotPosts(sectionId, limit = 10) {
   return res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
 }
 
-// 获取帖子详情
-export async function getPostById(id) {
+// 获取帖子详情（支持草稿）
+export async function getPostById(id, allowDraft = false) {
   const post = await repo.findById('posts', id);
   if (!post || post.deletedAt) {
+    throw new NotFoundError('帖子不存在');
+  }
+  // 非草稿模式且帖子为草稿状态，拒绝访问
+  if (!allowDraft && post.status === 0) {
     throw new NotFoundError('帖子不存在');
   }
   return sanitizePost(post);
@@ -116,9 +123,9 @@ export async function createPost(data) {
     summary: data.content.substring(0, 200) + '...',
     coverImage: data.coverImage,
     images: data.images || [],
-    type: data.type || 'article',
-    status: 'published',
-    originalType: data.originalType || 'original',
+    type: data.type || 1,
+    status: data.status || 2,
+    originalType: data.originalType || 1,
     authorId: data.authorId,
     authorName: data.authorName,
     authorAvatar: data.authorAvatar,
@@ -131,10 +138,10 @@ export async function createPost(data) {
     commentCount: 0,
     shareCount: 0,
     favoriteCount: 0,
-    isTop: false,
-    isHot: false,
-    isEssence: false,
-    isRecommended: false,
+    isTop: 0,
+    isHot: 0,
+    isEssence: 0,
+    isRecommended: 0,
     originalPostId: data.originalPostId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -143,6 +150,18 @@ export async function createPost(data) {
   };
 
   await repo.insert('posts', post);
+
+  // 插入帖子-分区关联
+  if (Array.isArray(data.sectionIds) && data.sectionIds.length > 0) {
+    for (const sectionId of data.sectionIds) {
+      await repo.insert('post_sections', {
+        id: generateId(),
+        postId: post.id,
+        sectionId,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
 
   // 更新作者发帖数
   await repo.increment('users', data.authorId, 'postCount', 1);
@@ -169,6 +188,20 @@ export async function updatePost(id, data) {
     ...data,
     updatedAt: new Date().toISOString(),
   });
+
+  // 更新帖子-分区关联
+  if (Array.isArray(data.sectionIds)) {
+    await repo.rawQuery('DELETE FROM post_sections WHERE post_id = $1', [id]);
+    for (const sectionId of data.sectionIds) {
+      await repo.insert('post_sections', {
+        id: generateId(),
+        postId: id,
+        sectionId,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   return sanitizePost(updated);
 }
 
@@ -300,7 +333,7 @@ export async function searchPosts(options = {}) {
   }
 
   const searchTerm = keyword.trim();
-  let whereClause = 'WHERE p.deleted_at IS NULL AND p.status = \'published\'';
+  let whereClause = 'WHERE p.deleted_at IS NULL AND p.status = 2';
   const params = [];
   let idx = 1;
 
@@ -356,9 +389,23 @@ function highlightText(text, keyword) {
   return htmlEscaped.replace(regex, '<mark>$1</mark>');
 }
 
-// 清理帖子敏感信息
+// 帖子状态映射：DB smallint → 前端字符串
+const STATUS_MAP = { 0: 'draft', 1: 'pending_review', 2: 'published', 3: 'rejected' };
+// 帖子类型映射
+const TYPE_MAP = { 1: 'article', 2: 'video', 3: 'audio', 4: 'question', 5: 'poll', 6: 'live' };
+// 原创类型映射
+const ORIGINAL_TYPE_MAP = { 1: 'original', 2: 'recreate', 3: 'repost', 4: 'adaptation' };
+
+// 清理帖子敏感信息 + 类型转换（DB integer → 前端字符串/布尔值）
 function sanitizePost(post) {
   return {
     ...post,
+    status: STATUS_MAP[post.status] ?? post.status,
+    type: TYPE_MAP[post.type] ?? post.type,
+    originalType: ORIGINAL_TYPE_MAP[post.originalType] ?? post.originalType,
+    isTop: !!post.isTop,
+    isHot: !!post.isHot,
+    isEssence: !!post.isEssence,
+    isRecommended: !!post.isRecommended,
   };
 }

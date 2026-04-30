@@ -15,6 +15,7 @@ import {
 } from '../services/live.service.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createRoomSchema, sendMessageSchema, sendGiftSchema } from '../validations/live.js';
+import * as repo from '../models/repository.js';
 
 const router = express.Router();
 
@@ -24,6 +25,12 @@ const router = express.Router();
 router.get('/rooms', asyncHandler(async (req, res) => {
   const result = await getLiveRooms(req.query);
   success(res, result);
+}));
+
+// 获取直播回放列表
+router.get('/rooms/:id/recordings', asyncHandler(async (req, res) => {
+  const recordings = await repo.findAll('live_recordings', { where: { roomId: req.params.id, status: 1 } });
+  success(res, recordings);
 }));
 
 // 直播间详情

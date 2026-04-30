@@ -31,6 +31,7 @@ const JSONB_FIELDS = {
   announcements: [],
   dict_items: ['extra'],
   subscriptions: ['notificationSettings'],
+  asset_rules: ['conditions', 'rewards'],
 };
 
 function serializeForPg(table, data) {

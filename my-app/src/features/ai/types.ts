@@ -70,3 +70,36 @@ export interface MemoryListQuery {
   type?: number;
   keyword?: string;
 }
+
+// ===== 草稿类型 =====
+export interface Draft {
+  id: string;
+  title: string;
+  content: string;
+  summary?: string;
+  sectionId?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DraftListQuery {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+}
+
+export interface CreateDraftDto {
+  title: string;
+  content: string;
+  sectionId?: string;
+  tags?: string[];
+}
+
+export interface UpdateDraftDto {
+  title?: string;
+  content?: string;
+  sectionId?: string;
+  tags?: string[];
+  status?: 'draft' | 'published';
+}

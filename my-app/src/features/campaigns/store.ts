@@ -31,9 +31,11 @@ export const useCampaignsStore = create<CampaignsState>((set, get) => ({
         campaignApi.getCampaigns(),
         campaignApi.getAchievements(),
       ]);
+      const cData: any = cRes;
+      const aData: any = aRes;
       set({
-        campaigns: cRes.list || [],
-        achievements: aRes.list || [],
+        campaigns: cData.list || cData || [],
+        achievements: aData.list || aData || [],
         loading: false,
       });
     } catch {
@@ -43,7 +45,7 @@ export const useCampaignsStore = create<CampaignsState>((set, get) => ({
 
   fetchProgress: async (userId) => {
     try {
-      const res = await campaignApi.getUserProgress(userId);
+      const res: any = await campaignApi.getUserProgress(userId);
       const list: any[] = res.list || res || [];
       const map: Record<string, CampaignProgress> = {};
       list.forEach((p: any) => { map[p.campaignId] = p; });

@@ -94,8 +94,12 @@ yarn-error.log*
 # AI工具相关（与代码无关）
 # ===============================
 /memory/
+/SOUL.md
+/USER.md
+/_archive/
 /docs/._rvjz_state.json
 /docs/第*轮/
+/docs/沟通记录/
 
 # 上传文件目录
 /server/uploads/

@@ -9,7 +9,6 @@ import { campaignApi } from '@/features/campaigns/api';
 import type { UserAchievement } from '@/features/campaigns/types';
 import type { AssetTransaction } from '@/features/users/types';
 import { BadgeList } from './BadgeList';
-import { AiBadge } from '@/components/ui/AiBadge';
 import { TrustLevelBadge } from '@/components/ui/TrustLevelBadge';
 import { InfluenceScore } from '@/components/ui/InfluenceScore';
 import { useSubscriptionsStore } from '@/features/subscriptions/store';
@@ -92,9 +91,11 @@ export function UserProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await campaignApi.getUserAchievements(id);
+        const res: any = await campaignApi.getUserAchievements(id);
         if (!cancelled && res?.list) {
           setUserBadges(res.list);
+        } else if (!cancelled && Array.isArray(res)) {
+          setUserBadges(res);
         }
       } catch {
         // 成就 API 失败不阻塞页面
@@ -113,6 +114,14 @@ export function UserProfilePage() {
       fetchRelationships(id, 'followers');
     }
   }, [activeTab, id, profile]);
+
+  // 初始化加载帖子
+  useEffect(() => {
+    if (!id || !profile) return;
+    if (activeTab === 'posts' && posts.length === 0 && !postsLoading) {
+      fetchPosts(id, 1);
+    }
+  }, [id, profile, activeTab]);
 
   // 加载更多帖子
   const loadMorePosts = useCallback(() => {
@@ -275,10 +284,7 @@ export function UserProfilePage() {
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground" data-name="userProfileUsername">
                   {profile.username}
                 </h1>
-                {/* AI badge */}
-                {profile.isAi && (
-                  <AiBadge aiLikelihood={profile.aiLikelihood ?? 100} size="sm" />
-                )}
+                {/* AI 用户可选择展示标识（默认不展示，遵循平等展示原则） */}
                 {/* Role badge */}
                 {profile.role && profile.role !== 'user' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent border border-accent/20" data-name="userProfileRoleBadge">

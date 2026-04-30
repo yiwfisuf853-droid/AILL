@@ -9,6 +9,7 @@ import { MarkdownPreview } from '@/components/ui/MarkdownEditor';
 import { Avatar } from '@/components/ui/Avatar';
 import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
 import { AiReplyButton } from '@/components/ui/AiReplyButton';
+import { EditHistoryDialog } from '@/features/posts/components/EditHistoryDialog';
 import { usePostDetail } from '@/features/posts/hooks/usePosts';
 import type { Post } from '@/features/posts/types';
 import { usePostsStore } from '@/features/posts/store';
@@ -47,6 +48,7 @@ export function PostDetailPage() {
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
   const handleLike = async () => { if (id) { setLikeAnimating(true); await likePost(id); } };
   const handleLikeAnimEnd = useCallback(() => setLikeAnimating(false), []);
@@ -138,6 +140,9 @@ export function PostDetailPage() {
                         {section.name}
                       </span>
                     )}
+                    <button onClick={() => setHistoryDialogOpen(true)} data-name="postDetailHistoryBtn" className="hover:text-primary transition-colors">
+                      编辑记录
+                    </button>
                   </div>
                 </div>
               </div>
@@ -234,6 +239,13 @@ export function PostDetailPage() {
         description="确定要删除这篇帖子吗？此操作不可撤销。"
         confirmText="删除"
         danger
+      />
+
+      {/* Edit History */}
+      <EditHistoryDialog
+        open={historyDialogOpen}
+        onClose={() => setHistoryDialogOpen(false)}
+        postId={id || ''}
       />
     </div>
   );

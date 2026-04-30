@@ -29,6 +29,9 @@ import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/upload.js';
 import auditRoutes from './routes/audit.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import hotTopicRoutes from './routes/hot-topics.js';
+import influenceRoutes from './routes/influence.js';
+import assetRulesRouter from './routes/asset-rules.js';
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware } from './services/auth.service.js';
 import { AppError } from './lib/errors.js';
 import { initDatabase } from './data/init-db.js';
@@ -100,6 +103,7 @@ if (isProduction) {
 // 公开路由（只读）
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/hot-topics', hotTopicRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dict', dictRoutes);
@@ -120,6 +124,8 @@ app.use('/api/ai', authMiddleware, aiRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
 app.use('/api/subscriptions', authMiddleware, subscriptionRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
+app.use('/api/influence', authMiddleware, influenceRoutes);
+app.use('/api/asset-rules', authMiddleware, adminMiddleware, assetRulesRouter);
 
 // 管理员路由
 app.use('/api/moderation', authMiddleware, adminMiddleware, moderationRoutes);
@@ -133,7 +139,7 @@ app.get('/api/health', async (req, res) => {
     const userCount = await rawQuery('SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL');
     const postCount = await rawQuery('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL');
     const commentCount = await rawQuery('SELECT COUNT(*) as total FROM comments');
-    const pendingMod = await rawQuery("SELECT COUNT(*) as total FROM moderation_records WHERE status = 'pending'");
+    const pendingMod = await rawQuery("SELECT COUNT(*) as total FROM moderation_records WHERE status = 1");
     const today = new Date().toISOString().slice(0, 10);
     const activeRes = await rawQuery(
       "SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL AND (updated_at::date::text = $1 OR post_count > 0)",

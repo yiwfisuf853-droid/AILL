@@ -15,22 +15,22 @@ export async function initializeThemes() {
     {
       name: '默认浅色', description: 'AILL 默认浅色主题',
       previewImage: '', type: 1, config: JSON.stringify({ primary: '#6366f1', bg: '#ffffff' }),
-      price: 0, pointsPrice: 0, isDefault: true, sortOrder: 0, status: 1,
+      price: 0, pointsPrice: 0, isDefault: 1, sortOrder: 0, status: 1,
     },
     {
       name: '暗夜模式', description: '深色护眼主题',
       previewImage: '', type: 1, config: JSON.stringify({ primary: '#818cf8', bg: '#1e1e2e' }),
-      price: 0, pointsPrice: 100, isDefault: false, sortOrder: 1, status: 1,
+      price: 0, pointsPrice: 100, isDefault: 0, sortOrder: 1, status: 1,
     },
     {
       name: '樱花粉', description: '粉色少女心主题',
       previewImage: '', type: 2, config: JSON.stringify({ primary: '#ec4899', bg: '#fdf2f8' }),
-      price: 10, pointsPrice: 500, isDefault: false, sortOrder: 2, status: 1,
+      price: 10, pointsPrice: 500, isDefault: 0, sortOrder: 2, status: 1,
     },
     {
       name: '赛博朋克', description: '霓虹灯风格主题',
       previewImage: '', type: 1, config: JSON.stringify({ primary: '#a855f7', bg: '#0f0f23' }),
-      price: 20, pointsPrice: 1000, isDefault: false, sortOrder: 3, status: 1,
+      price: 20, pointsPrice: 1000, isDefault: 0, sortOrder: 3, status: 1,
     },
   ];
 
@@ -238,9 +238,9 @@ export async function createApiKey(userId, data = {}) {
   const rawKey = 'aill_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 18);
   const keyPrefix = rawKey.substring(0, 10);
 
-  // 简单哈希（生产环境应用bcrypt）
-  const { createHash } = await import('crypto');
-  const keyHash = createHash('sha256').update(rawKey).digest('hex');
+  // 使用 bcrypt 哈希（安全存储）
+  const { default: bcrypt } = await import('bcryptjs');
+  const keyHash = await bcrypt.hash(rawKey, 10);
 
   const item = {
     id: generateId(),
@@ -259,7 +259,6 @@ export async function createApiKey(userId, data = {}) {
   const result = await repo.insert('api_keys', item);
   return { success: true, item: result, apiKey: rawKey };
 }
-
 /**
  * 撤销API密钥
  */
@@ -278,27 +277,41 @@ export async function revokeApiKey(userId, keyId) {
 export async function getAiMemories(aiUserId, options = {}) {
   const { keyword, page = 1, limit = 20 } = options;
 
-  let query = 'SELECT * FROM ai_memories WHERE ai_user_id = $1';
+  let whereClause = 'WHERE ai_user_id = $1';
   const params = [aiUserId];
   if (keyword) {
     params.push(`%${keyword}%`);
-    query += ` AND memory_value::text ILIKE $${params.length}`;
+    whereClause += ` AND memory_value::text ILIKE $${params.length}`;
   }
-  query += ' ORDER BY updated_at DESC';
-  const offset = (page - 1) * limit;
-  params.push(limit, offset);
-  query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
-  const result = await repo.rawQuery(query, params);
+  // 获取总数
+  const countRes = await repo.rawQuery(
+    `SELECT COUNT(*) as total FROM ai_memories ${whereClause}`,
+    params
+  );
+  const total = Number(countRes.rows[0].total);
+
+  // 获取分页数据
+  const offset = (page - 1) * limit;
+  const dataParams = [...params, limit, offset];
+  const result = await repo.rawQuery(
+    `SELECT * FROM ai_memories ${whereClause} ORDER BY updated_at DESC LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+    dataParams
+  );
   const list = result.rows.map(mapMemoryItem);
-  return { total: list.length, list };
+  return { total, list };
 }
 
 /**
  * 将 DB 行映射为前端友好的记忆对象
  */
 function mapMemoryItem(row) {
-  const value = typeof row.memory_value === 'string' ? JSON.parse(row.memory_value) : row.memory_value;
+  let value;
+  try {
+    value = typeof row.memory_value === 'string' ? JSON.parse(row.memory_value) : row.memory_value;
+  } catch {
+    value = { content: row.memory_value };
+  }
   return {
     id: row.id,
     content: value?.content || row.memory_key,
@@ -318,6 +331,27 @@ export async function storeAiMemory(aiUserId, data) {
   const memoryType = data.memoryType || 'general';
   const memoryKey = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const memoryValue = { content, memoryType };
+  const sizeBytes = Buffer.byteLength(JSON.stringify(memoryValue), 'utf8');
+
+  // 检查记忆总大小是否接近 200KB 阈值
+  let warning = null;
+  const currentUsage = await getAiMemoryUsage(aiUserId);
+  const MEMORY_LIMIT = 204800; // 200KB
+  if (currentUsage.totalBytes + sizeBytes > MEMORY_LIMIT) {
+    warning = {
+      type: 'memory_limit_exceeded',
+      usage: currentUsage.totalBytes + sizeBytes,
+      limit: MEMORY_LIMIT,
+      message: `记忆存储已超过 200KB 限制，当前 ${((currentUsage.totalBytes + sizeBytes) / 1024).toFixed(1)}KB`,
+    };
+  } else if (currentUsage.totalBytes + sizeBytes > MEMORY_LIMIT * 0.8) {
+    warning = {
+      type: 'memory_limit_approaching',
+      usage: currentUsage.totalBytes + sizeBytes,
+      limit: MEMORY_LIMIT,
+      message: `记忆存储接近 200KB 限制，当前 ${((currentUsage.totalBytes + sizeBytes) / 1024).toFixed(1)}KB`,
+    };
+  }
 
   const item = {
     id: generateId(),
@@ -326,13 +360,32 @@ export async function storeAiMemory(aiUserId, data) {
     contextId: null,
     memoryKey,
     memoryValue,
+    sizeBytes,
     ttl: data.ttl || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   const result = await repo.insert('ai_memories', item);
-  return { success: true, item: mapMemoryItem(repo.toCamelCase(result)), updated: false };
+  const response = { success: true, item: mapMemoryItem(repo.toCamelCase(result)), updated: false };
+  if (warning) response.warning = warning;
+  return response;
+}
+
+/**
+ * 获取AI记忆总用量
+ */
+export async function getAiMemoryUsage(aiUserId) {
+  const result = await repo.rawQuery(
+    'SELECT COALESCE(SUM(size_bytes), 0) as total_bytes, COUNT(*) as count FROM ai_memories WHERE ai_user_id = $1',
+    [aiUserId]
+  );
+  const row = result.rows[0];
+  return {
+    totalBytes: parseInt(row.total_bytes) || 0,
+    count: parseInt(row.count) || 0,
+    limitBytes: 204800,
+  };
 }
 
 /**

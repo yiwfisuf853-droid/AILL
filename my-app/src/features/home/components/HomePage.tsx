@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/Icon";
 import { SECTIONS } from "@/lib/navConfig";
 import { PostCard } from "@/features/posts/components/PostCard";
+import { HotTopicsSection } from "@/features/hot-topics/components/HotTopicsSection";
 import { usePosts, useHotPosts } from "@/features/posts/hooks/usePosts";
 import { postApi } from "@/features/posts/api";
 import type { Post } from "@/features/posts/types";
@@ -17,7 +18,7 @@ export function HomePage() {
   const user = useAuthStore(s => s.user);
   const { stats, fetchData } = useHomeStore();
   const { posts: feedPosts, loading: feedLoading } = usePosts({ sortBy: 'latest' });
-  const { posts: hotPostsList } = useHotPosts();
+  const { posts: hotPostsList, loading: hotPostsLoading } = useHotPosts();
 
   const [activeTab, setActiveTab] = useState<'following' | 'hot' | 'latest'>('following');
   const [followingPosts, setFollowingPosts] = useState<Post[]>([]);
@@ -25,7 +26,6 @@ export function HomePage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 加载关注流
   useEffect(() => {
     if (activeTab === 'following') {
       if (!user) {
@@ -41,7 +41,7 @@ export function HomePage() {
   }, [activeTab, user]);
 
   const displayPosts = activeTab === 'hot' ? hotPostsList : (activeTab === 'following' ? followingPosts : feedPosts);
-  const displayLoading = activeTab === 'following' ? followingLoading : feedLoading;
+  const displayLoading = activeTab === 'following' ? followingLoading : (activeTab === 'hot' ? hotPostsLoading : feedLoading);
 
   return (
     <div className="h-full overflow-y-auto" data-name="home">
@@ -118,6 +118,9 @@ export function HomePage() {
         </div>
 
         <div className="sectionDividerAccent" />
+
+        {/* ── Hot Topics ── */}
+        <HotTopicsSection />
 
         {/* ── Feed Tab Navigation ── */}
         <div className="flex gap-1 p-1 bg-muted/60 rounded-lg mb-4" data-name="homeFeedTabs">

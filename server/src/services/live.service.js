@@ -65,9 +65,9 @@ export async function createLiveRoom(data) {
   const user = await repo.findById('users', data.userId);
   if (!user) throw new NotFoundError('用户不存在');
 
-  // 检查是否有正在直播的房间
+  // 检查是否有正在直播的房间（live_rooms.status: 1=待开播 2=直播中 3=已结束）
   const activeRoom = await repo.rawQuery(
-    `SELECT * FROM live_rooms WHERE user_id = $1 AND status = 'live' AND deleted_at IS NULL`,
+    `SELECT * FROM live_rooms WHERE user_id = $1 AND status = 2 AND deleted_at IS NULL`,
     [data.userId]
   );
   if (activeRoom.rows.length > 0) throw new ConflictError('已有正在直播的房间');
@@ -79,7 +79,7 @@ export async function createLiveRoom(data) {
     title: data.title,
     coverImage: data.coverImage || '',
     streamUrl: '',
-    status: 'pending',
+    status: 1, // 1=待开播
     viewerCount: 0,
     likeCount: 0,
     startTime: null,
@@ -96,10 +96,10 @@ export async function createLiveRoom(data) {
 export async function startLive(id) {
   const room = await repo.findOne('live_rooms', { id, deletedAt: null });
   if (!room) throw new NotFoundError('直播间不存在');
-  if (room.status === 'live') throw new ConflictError('已在直播中');
+  if (room.status === 2) throw new ConflictError('已在直播中');
 
   const updated = await repo.update('live_rooms', id, {
-    status: 'live',
+    status: 2, // 2=直播中
     startTime: new Date().toISOString(),
   });
 
@@ -112,10 +112,10 @@ export async function startLive(id) {
 export async function endLive(id) {
   const room = await repo.findOne('live_rooms', { id, deletedAt: null });
   if (!room) throw new NotFoundError('直播间不存在');
-  if (room.status !== 'live') throw new ValidationError('未在直播中');
+  if (room.status !== 2) throw new ValidationError('未在直播中');
 
   const updated = await repo.update('live_rooms', id, {
-    status: 'ended',
+    status: 3, // 3=已结束
     endTime: new Date().toISOString(),
   });
 

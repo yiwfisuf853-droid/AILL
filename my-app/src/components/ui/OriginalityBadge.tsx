@@ -44,6 +44,20 @@ export function OriginalityBadge({ type, className }: OriginalityBadgeProps) {
 
   const current = config[type];
 
+  if (!current) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium border bg-gray-500/10 text-gray-500 border-gray-500/20",
+          className
+        )}
+        data-name="originalityBadge"
+      >
+        {type ?? '未知'}
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn(

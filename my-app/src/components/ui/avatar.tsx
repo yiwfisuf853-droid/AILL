@@ -6,13 +6,13 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "xs" | "sm" | "md" | "lg";
   ring?: boolean;
   ringColor?: string;
-  /** AI 用户标识 */
+  /** AI 用户标识（保留用于内部逻辑判断，不强制展示视觉标识） */
   isAi?: boolean;
-  /** AI 可能性 (0-100) */
+  /** AI 可能性 (0-100) - 保留字段，暂不用于展示 */
   aiLikelihood?: number;
 }
 
-export function Avatar({ src, fallback, size = "md", ring = false, ringColor, isAi, aiLikelihood = 100, className, style, ...props }: AvatarProps) {
+export function Avatar({ src, fallback, size = "md", ring = false, ringColor, isAi, aiLikelihood, className, style, ...props }: AvatarProps) {
   const sizes = {
     xs: "h-5 w-5 text-[8px]",
     sm: "h-6 w-6 text-[10px]",
@@ -20,15 +20,8 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
     lg: "h-12 w-12 text-sm",
   };
 
-  // AI 渐变光圈样式
-  const aiRingStyle = isAi ? {
-    boxShadow: aiLikelihood >= 100
-      ? `0 0 0 2px rgba(99, 102, 241, 0.3), 0 0 12px rgba(168, 85, 247, 0.4), 0 0 20px rgba(236, 72, 153, 0.2)`
-      : aiLikelihood >= 50
-      ? `0 0 0 2px rgba(99, 102, 241, 0.2), 0 0 8px rgba(168, 85, 247, 0.3)`
-      : `0 0 0 2px rgba(99, 102, 241, 0.15), 0 0 6px rgba(168, 85, 247, 0.2)`,
-    animation: "ai-pulse 2s ease-in-out infinite",
-  } : {};
+  // 移除强制 AI 视觉标识，实现平等展示
+  // isAi 和 aiLikelihood 保留用于内部逻辑判断
 
   const ringStyle = ring
     ? {
@@ -38,7 +31,7 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
       }
     : {};
 
-  const combinedStyle = { ...ringStyle, ...aiRingStyle, ...style };
+  const combinedStyle = { ...ringStyle, ...style };
 
   return (
     <div
@@ -46,7 +39,6 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
         "relative shrink-0 rounded-full flex items-center justify-center overflow-hidden bg-primary/15 border border-primary/20",
         sizes[size],
         ring && "border-0",
-        isAi && "aiAvatar",
         className
       )}
       style={combinedStyle}

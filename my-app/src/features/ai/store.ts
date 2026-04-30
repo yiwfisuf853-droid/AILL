@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { aiApi } from "./api";
-import type { Theme, AiProfile } from "./types";
+import type { Theme, AiProfile, Draft } from "./types";
 
 interface ApiKey {
   id: string;
@@ -18,7 +18,7 @@ interface Memory {
   createdAt: string;
 }
 
-type TabKey = "overview" | "create" | "apiMemory" | "profile" | "themes" | "apikeys" | "memories";
+type TabKey = "overview" | "create" | "drafts" | "apiMemory" | "profile" | "themes" | "apikeys" | "memories";
 
 interface AiState {
   // Tab state
@@ -60,11 +60,18 @@ interface AiState {
   setNewMemory: (memory: string) => void;
   setStoringMemory: (storing: boolean) => void;
 
+  // Draft state
+  drafts: Draft[];
+  draftsLoading: boolean;
+  setDrafts: (drafts: Draft[]) => void;
+  setDraftsLoading: (loading: boolean) => void;
+
   // Actions
   fetchProfile: (userId: string) => Promise<void>;
   fetchThemes: (userId: string) => Promise<void>;
   fetchApiKeys: (userId: string) => Promise<void>;
   fetchMemories: (userId: string) => Promise<void>;
+  fetchDrafts: (userId: string) => Promise<void>;
   fetchData: (userId: string) => Promise<void>;
 
   upsertProfile: (userId: string, data: Partial<AiProfile>) => Promise<void>;
@@ -74,6 +81,9 @@ interface AiState {
   revokeApiKey: (userId: string, keyId: string) => Promise<void>;
   storeMemory: (userId: string, data: { content: string }) => Promise<void>;
   deleteMemory: (userId: string, memoryId: string) => Promise<void>;
+  saveDraft: (data: { title: string; content: string; sectionId?: string; tags?: string[] }) => Promise<void>;
+  publishDraft: (postId: string, userId: string) => Promise<void>;
+  deleteDraft: (postId: string, userId: string) => Promise<void>;
 }
 
 export const useAiStore = create<AiState>((set, get) => ({
@@ -91,6 +101,8 @@ export const useAiStore = create<AiState>((set, get) => ({
   memories: [],
   newMemory: "",
   storingMemory: false,
+  drafts: [],
+  draftsLoading: false,
 
   // Setters
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -109,11 +121,13 @@ export const useAiStore = create<AiState>((set, get) => ({
   setMemories: (memories) => set({ memories }),
   setNewMemory: (memory) => set({ newMemory: memory }),
   setStoringMemory: (storing) => set({ storingMemory: storing }),
+  setDrafts: (drafts) => set({ drafts }),
+  setDraftsLoading: (loading) => set({ draftsLoading: loading }),
 
   // Data fetchers
   fetchProfile: async (userId) => {
     try {
-      const res = await aiApi.getAiProfile(userId);
+      const res: any = await aiApi.getAiProfile(userId);
       set({ profile: res.profile || res || null });
     } catch {
       set({ profile: null });
@@ -126,8 +140,10 @@ export const useAiStore = create<AiState>((set, get) => ({
         aiApi.getThemes(),
         userId ? aiApi.getUserThemes(userId) : Promise.resolve({ list: [] }),
       ]);
-      set({ themes: allRes.list || [], userTheme: userRes.list || [] });
-      const activeTheme = (userRes.list || []).find(
+      const allThemes: any = allRes;
+      const userThemes: any = userRes;
+      set({ themes: allThemes.list || allThemes || [], userTheme: userThemes.list || userThemes || [] });
+      const activeTheme = (userThemes.list || userThemes || []).find(
         (t: Theme & { isActive?: number }) => (t as any).isActive === 1
       );
       set({ activeThemeId: activeTheme?.id || null });
@@ -138,8 +154,9 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   fetchApiKeys: async (userId) => {
     try {
-      const res = await aiApi.getApiKeys(userId);
-      set({ apiKeys: (res.list || []).map((k: any) => ({ ...k, key: k.key || k.keyPrefix })) });
+      const res: any = await aiApi.getApiKeys(userId);
+      const keysList = res.list || res || [];
+      set({ apiKeys: keysList.map((k: any) => ({ ...k, key: k.key || k.keyPrefix })) });
     } catch {
       set({ apiKeys: [] });
     }
@@ -147,10 +164,23 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   fetchMemories: async (userId) => {
     try {
-      const res = await aiApi.getMemories(userId);
-      set({ memories: res.list || [] });
+      const res: any = await aiApi.getMemories(userId);
+      const memList = res.list || res || [];
+      set({ memories: memList });
     } catch {
       set({ memories: [] });
+    }
+  },
+
+  fetchDrafts: async (userId) => {
+    set({ draftsLoading: true });
+    try {
+      const res: any = await aiApi.getDrafts(userId, { pageSize: 50, sortBy: 'latest' });
+      set({ drafts: res.list || res || [] });
+    } catch {
+      set({ drafts: [] });
+    } finally {
+      set({ draftsLoading: false });
     }
   },
 
@@ -163,6 +193,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     if (activeTab === "themes") promises.push(get().fetchThemes(userId));
     if (activeTab === "apikeys" || activeTab === "apiMemory") promises.push(get().fetchApiKeys(userId));
     if (activeTab === "memories" || activeTab === "apiMemory") promises.push(get().fetchMemories(userId));
+    if (activeTab === "drafts") promises.push(get().fetchDrafts(userId));
     // overview 和 create 不需要额外 fetch
 
     if (promises.length === 0) {
@@ -220,5 +251,19 @@ export const useAiStore = create<AiState>((set, get) => ({
   deleteMemory: async (userId, memoryId) => {
     await aiApi.deleteAiMemory(userId, memoryId);
     await get().fetchMemories(userId);
+  },
+
+  saveDraft: async (data) => {
+    await aiApi.saveDraft(data);
+  },
+
+  publishDraft: async (postId, userId) => {
+    await aiApi.publishDraft(postId);
+    await get().fetchDrafts(userId);
+  },
+
+  deleteDraft: async (postId, userId) => {
+    await aiApi.deleteDraft(postId);
+    await get().fetchDrafts(userId);
   },
 }));

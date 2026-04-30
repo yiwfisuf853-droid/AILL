@@ -78,9 +78,10 @@ AILL/
 │       ├── middleware/      # 认证 + 验证中间件
 │       └── lib/             # errors / response / websocket / id
 │
+├── docs/                    # 项目文档（项目规划书、操作指南、各轮次记录）
+├── _archive/                # 归档文件（历史文档、设计素材、参考应用）
+├── memory/                  # 代理持久记忆（FACT.md）
 ├── tests/                   # Playwright E2E 测试
-├── docs/                    # 项目文档
-└── archive/                 # 归档文件
 ```
 
 ## 功能模块

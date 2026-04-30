@@ -10,8 +10,8 @@ export const commentApi = {
     if (query.pageSize) params.append('pageSize', query.pageSize.toString());
     if (query.sortBy) params.append('sortBy', query.sortBy);
 
-    const response = await api.get<CommentListResponse>(`/api/comments?${params}`);
-    return response.data;
+    const response = await api.get<{ success: boolean; data: CommentListResponse }>(`/api/comments?${params}`);
+    return response.data.data;
   },
 
   // 获取子评论列表
@@ -20,20 +20,20 @@ export const commentApi = {
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
 
-    const response = await api.get<CommentListResponse>(`/api/comments/${commentId}/replies?${params}`);
-    return response.data;
+    const response = await api.get<{ success: boolean; data: CommentListResponse }>(`/api/comments/${commentId}/replies?${params}`);
+    return response.data.data;
   },
 
   // 获取评论详情
   async getCommentDetail(id: string): Promise<Comment> {
-    const response = await api.get<Comment>(`/api/comments/${id}`);
-    return response.data;
+    const response = await api.get<{ success: boolean; data: Comment }>(`/api/comments/${id}`);
+    return response.data.data;
   },
 
   // 创建评论
   async createComment(data: CommentCreateDto): Promise<Comment> {
-    const response = await api.post<Comment>('/api/comments', data);
-    return response.data;
+    const response = await api.post<{ success: boolean; data: Comment }>('/api/comments', data);
+    return response.data.data;
   },
 
   // 删除评论
@@ -43,7 +43,7 @@ export const commentApi = {
 
   // 点赞评论（后端使用 toggle 模式）
   async likeComment(id: string): Promise<{ likeCount: number; isLiked: boolean }> {
-    const response = await api.post(`/api/comments/${id}/like`);
-    return response.data;
+    const response = await api.post<{ success: boolean; data: { likeCount: number; isLiked: boolean } }>(`/api/comments/${id}/like`);
+    return response.data.data;
   },
 };

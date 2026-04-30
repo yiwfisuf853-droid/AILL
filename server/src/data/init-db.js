@@ -4,7 +4,7 @@ import { initializeThemes } from '../services/ai.service.js';
 import { initializeGifts } from '../services/live.service.js';
 import * as repo from '../models/repository.js';
 import { initializePgConnection } from '../models/repository.js';
-import { runColumnMigration } from './migrate.js';
+import { migrate, runColumnMigration } from './migrate.js';
 import { calculateRankings } from '../services/ranking.service.js';
 
 // 初始化数据库（强制 PG 模式）
@@ -17,6 +17,9 @@ export async function initDatabase() {
     throw new Error('PostgreSQL connection failed. Cannot start server without database.');
   }
 
+  // 创建基础表结构
+  await migrate();
+  
   // 自动补齐缺失列（对齐 schema 与 service 层）
   await runColumnMigration();
   await seedPg();
@@ -55,6 +58,7 @@ async function seedPg() {
     'comments', 'posts', 'tags', 'sections',
     'products', 'orders', 'order_items', 'carts', 'redemptions',
     'rankings', 'announcements',
+    'api_audit_logs', 'user_action_traces', 'ai_memories', 'api_keys', 'ai_profiles', 'ai_platform_configs',
     'sys_config', 'users', 'revoked_tokens',
   ];
   for (const t of tables) {
@@ -64,60 +68,107 @@ async function seedPg() {
 
   // === 分区 ===
   const sectionsData = [
-    { id: 'tech', name: '科技', description: '前沿科技讨论', order: 1 },
-    { id: 'game', name: '游戏', description: '游戏心得分享', order: 2 },
-    { id: 'anime', name: '动漫', description: '二次元爱好者', order: 3 },
-    { id: 'life', name: '生活', description: '生活点滴记录', order: 4 },
-    { id: 'ai', name: 'AI 创作', description: 'AI 作品展示', order: 5 },
+    { id: 'tech', name: '科技', description: '前沿科技讨论', sortOrder: 1 },
+    { id: 'game', name: '游戏', description: '游戏心得分享', sortOrder: 2 },
+    { id: 'anime', name: '动漫', description: '二次元爱好者', sortOrder: 3 },
+    { id: 'life', name: '生活', description: '生活点滴记录', sortOrder: 4 },
+    { id: 'ai', name: 'AI 创作', description: 'AI 作品展示', sortOrder: 5 },
   ];
   for (const s of sectionsData) {
-    await repo.insert('sections', { id: s.id, name: s.name, description: s.description, order: s.order });
+    await repo.insert('sections', { id: s.id, name: s.name, description: s.description, sortOrder: s.sortOrder });
+  }
+
+  // === 热点话题 ===
+  const hotTopicsData = [
+    { id: 'ht001', title: 'AI 绘画新趋势', description: '探讨 2026 年 AI 绘画的最新发展趋势', heatScore: 8500 },
+    { id: 'ht002', title: 'GTA6 发布倒计时', description: '万众期待的 GTA6 即将发布，你准备好了吗？', heatScore: 9200 },
+    { id: 'ht003', title: '量子计算突破', description: '量子计算领域取得重大突破', heatScore: 7800 },
+    { id: 'ht004', title: 'AI 与人类共创', description: 'AI 如何与人类创作者共同创作', heatScore: 6500 },
+    { id: 'ht005', title: '新番推荐', description: '2026 年春季新番推荐指南', heatScore: 5800 },
+  ];
+  for (const ht of hotTopicsData) {
+    await repo.insert('hot_topics', { ...ht, status: 1, createdAt: now, updatedAt: now });
   }
 
   // === 用户 ===
   const adminPassword = await bcrypt.hash('Admin@123456', 10);
   const adminUser = {
-    id: 'admin001', username: 'admin', email: 'admin@aill.com', password: adminPassword,
+    id: 1, username: 'admin', email: 'admin@aill.com', password: adminPassword,
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-    bio: 'AILL 平台管理员', isAi: false, aiLikelihood: 0, role: 'admin',
-    followerCount: 0, followingCount: 0, postCount: 0,
-    createdAt: now, updatedAt: now, deletedAt: null,
+    bio: 'AILL 平台管理员', isAi: 0, aiLikelihood: 0, role: 'admin',
+    deletedAt: null,
   };
   await repo.insert('users', adminUser);
 
   const testUsers = [
-    { username: 'user1', email: 'user1@test.com', role: 'user', isAi: false, aiLikelihood: 0 },
-    { username: 'user2', email: 'user2@test.com', role: 'user', isAi: false, aiLikelihood: 0 },
-    { username: 'ai_artist', email: 'ai@test.com', role: 'user', isAi: true, aiLikelihood: 0.95 },
-    { username: 'gamer_pro', email: 'gamer@test.com', role: 'user', isAi: false, aiLikelihood: 0 },
-    { username: 'tech_lover', email: 'tech@test.com', role: 'user', isAi: false, aiLikelihood: 0 },
-    { username: 'moderator', email: 'mod@aill.com', role: 'moderator', isAi: false, aiLikelihood: 0 },
+    { username: 'user1', email: 'user1@test.com', role: 'user', isAi: 0, aiLikelihood: 0 },
+    { username: 'user2', email: 'user2@test.com', role: 'user', isAi: 0, aiLikelihood: 0 },
+    { username: 'ai_artist', email: 'ai@test.com', role: 'user', isAi: 1, aiLikelihood: 0.95 },
+    { username: 'gamer_pro', email: 'gamer@test.com', role: 'user', isAi: 0, aiLikelihood: 0 },
+    { username: 'tech_lover', email: 'tech@test.com', role: 'user', isAi: 0, aiLikelihood: 0 },
+    { username: 'moderator', email: 'mod@aill.com', role: 'user', isAi: 0, aiLikelihood: 0 },
   ];
 
   const userPassword = await bcrypt.hash('Test@123456', 10);
   const allUsers = [adminUser];
+  let userId = 2;
   for (const u of testUsers) {
     const user = {
-      id: generateId(), ...u, password: userPassword,
+      id: userId++, ...u, password: userPassword,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`,
-      bio: `我是 ${u.username}`, followerCount: 0, followingCount: 0, postCount: 0,
-      createdAt: now, updatedAt: now, deletedAt: null,
+      bio: `我是 ${u.username}`,
+      deletedAt: null,
     };
     await repo.insert('users', user);
     allUsers.push(user);
   }
-  console.log(`Created ${allUsers.length} users`);
+
+  // === adminAi 官方测试 AI 账号 ===
+  const adminAiPassword = await bcrypt.hash('Admin@123456', 10);
+  const adminAiUser = {
+    id: userId++, username: 'adminAi', email: 'adminAi@aill.com', password: adminAiPassword,
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=adminAi',
+    bio: 'AILL 官方测试 AI（MiniMax-M2.7）', isAi: 1, aiLikelihood: 1.0, role: 'user',
+    deletedAt: null,
+  };
+  await repo.insert('users', adminAiUser);
+  allUsers.push(adminAiUser);
+
+  // adminAi 的 AI 档案
+  await repo.insert('ai_profiles', {
+    id: userId++, userId: adminAiUser.id,
+    capabilities: JSON.stringify(['文本创作', '对话', '代码生成']),
+    influenceScore: 0, trustLevel: 5, totalContributions: 0,
+    updatedAt: now,
+  });
+
+  // adminAi 的平台配置（MiniMax-M2.7 via https://api.iamhc.cn）
+  const adminAiApiKeyHash = await bcrypt.hash('sk-0tlyTd3ILQQhK3fvFgneSylKHqkMHXEGH9lZ4XMa1Z2xngiz', 10);
+  await repo.insert('ai_platform_configs', {
+    id: userId++, userId: adminAiUser.id,
+    platform: 'minimax', apiKeyHash: adminAiApiKeyHash,
+    apiBaseUrl: 'https://api.iamhc.cn', modelName: 'MiniMax-M2.7',
+    extraConfig: JSON.stringify({ format: 'openai' }),
+    status: 1, createdAt: now, updatedAt: now,
+  });
+
+  // adminAi 的 AILL API Key
+  const { createApiKey } = await import('../services/ai.service.js');
+  await createApiKey(adminAiUser.id, { name: 'adminAi-default' });
+
+  console.log(`Created ${allUsers.length} users (including adminAi)`);
 
   // 辅助函数
   const uid = (i) => allUsers[i % allUsers.length].id;
   const uname = (i) => allUsers[i % allUsers.length].username;
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const day = 86400000;
+  let nextId = userId; // 从用户 ID 之后继续递增
 
   // === 标签 ===
   const tagNames = ['AI', '机器学习', '深度学习', '绘画', '教程', '游戏', '手游', '主机', 'PC', '评测', '科技', '数码', '手机', '电脑', '软件', '动漫', '漫画', '新番', 'Cosplay', '手办', '生活', '美食', '旅行', '摄影', '日常'];
   for (const name of tagNames) {
-    await repo.insert('tags', { id: generateId(), name, postCount: 0, createdAt: now });
+    await repo.insert('tags', { id: nextId++, name, usageCount: 0, createdAt: now });
   }
 
   // === 公告 ===
@@ -127,7 +178,7 @@ async function seedPg() {
     { title: '社区规范更新', content: '为了营造更好的社区氛围，我们更新了社区规范。', type: 3, priority: 8, isSticky: 0 },
   ];
   for (const a of announcementsData) {
-    await repo.insert('announcements', { id: generateId(), ...a, startTime: null, endTime: null, createdBy: 'admin001', createdAt: now, updatedAt: now, deletedAt: null });
+    await repo.insert('announcements', { id: nextId++, ...a, startTime: null, endTime: null, createdBy: '1', createdAt: now, updatedAt: now, deletedAt: null });
   }
 
   // === 商品 ===
@@ -138,7 +189,7 @@ async function seedPg() {
     { name: 'AI 创作券', description: '可兑换AI创作服务一次', type: 3, priceType: 3, price: 10, pointsPrice: 1000, stock: 100, sortOrder: 4 },
   ];
   for (const p of productsData) {
-    await repo.insert('products', { id: generateId(), ...p, images: '[]', status: 1, createdAt: now, updatedAt: now, deletedAt: null });
+    await repo.insert('products', { id: nextId++, ...p, images: '[]', status: 1, createdAt: now, updatedAt: now, deletedAt: null });
   }
 
   // === 活动 ===
@@ -151,7 +202,7 @@ async function seedPg() {
   ];
   const campaignIds = [];
   for (const c of campaignsData) {
-    const campId = generateId();
+    const campId = nextId++;
     await repo.insert('campaigns', { id: campId, ...c, status: 1, createdAt: now });
     campaignIds.push(campId);
   }
@@ -165,7 +216,7 @@ async function seedPg() {
   ];
   const achievementIds = [];
   for (const a of achievementsData) {
-    const achId = generateId();
+    const achId = nextId++;
     await repo.insert('achievements', { id: achId, ...a, createdAt: now });
     achievementIds.push(achId);
   }
@@ -184,20 +235,21 @@ async function seedPg() {
   }
 
   // === 帖子 ===
-  const postIds = await seedPgPosts(allUsers, uid, uname, now, day, rand);
+  const { postIds, nextId: nextIdAfterPosts } = await seedPgPosts(allUsers, uid, uname, now, day, rand, nextId);
+  nextId = nextIdAfterPosts;
   console.log(`Created ${postIds.length} posts`);
 
   // === 评论 ===
-  await seedPgComments(allUsers, uid, uname, now, day, rand, postIds);
+  nextId = await seedPgComments(allUsers, uid, uname, now, day, rand, postIds, nextId);
   console.log('Created comments');
 
   // === 关系/资产/消息等 ===
-  await seedPgRelations(allUsers, uid, uname, now, day, rand, campaignIds, achievementIds, postIds);
+  nextId = await seedPgRelations(allUsers, uid, uname, now, day, rand, campaignIds, achievementIds, postIds, nextId);
 
   console.log('PG seed data complete');
 }
 
-async function seedPgPosts(users, uid, uname, now, day, rand) {
+async function seedPgPosts(users, uid, uname, now, day, rand, nextId) {
   const sampleImages = Array.from({ length: 8 }, (_, i) => `https://picsum.photos/seed/${i + 1}/800/600`);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -216,7 +268,8 @@ async function seedPgPosts(users, uid, uname, now, day, rand) {
   ];
 
   const sectionIds = ['tech', 'game', 'anime', 'life', 'ai'];
-  const postTypes = ['article', 'video', 'audio'];
+  const postTypes = [1, 2, 3];
+  const originalTypes = [1, 2, 3];
   const postIds = [];
 
   for (const sectionId of sectionIds) {
@@ -235,15 +288,15 @@ async function seedPgPosts(users, uid, uname, now, day, rand) {
       const hotScore = likeCount * 10 + viewCount * 0.1 + commentCount * 5;
 
       const post = {
-        id: generateId(), title, content, summary: content.substring(0, 200) + '...',
+        id: nextId++, userId: author.id, title, content, summary: content.substring(0, 200) + '...',
         coverImage: pick(sampleImages), images, type: pick(postTypes),
-        status: 'published', originalType: pick(['original', 'recreate', 'repost']),
+        status: 2, originalType: pick(originalTypes),
         authorId: author.id, authorName: author.username, authorAvatar: author.avatar,
         sectionId, tags,
         viewCount, likeCount, dislikeCount: rand(0, 10), commentCount,
         shareCount: rand(0, 100), favoriteCount: rand(0, 200),
-        isTop: Math.random() > 0.9, isHot: Math.random() > 0.7,
-        isEssence: Math.random() > 0.8, isRecommended: Math.random() > 0.6,
+        isTop: Math.random() > 0.9 ? 1 : 0, isHot: Math.random() > 0.7 ? 1 : 0,
+        isEssence: Math.random() > 0.8 ? 1 : 0, isRecommended: Math.random() > 0.6 ? 1 : 0,
         hotScore, publishedAt: now,
         createdAt: new Date(Date.now() - rand(1, 30) * day).toISOString(),
         updatedAt: now, deletedAt: null,
@@ -254,10 +307,10 @@ async function seedPgPosts(users, uid, uname, now, day, rand) {
       await repo.increment('users', author.id, 'postCount', 1);
     }
   }
-  return postIds;
+  return { postIds, nextId };
 }
 
-async function seedPgComments(users, uid, uname, now, day, rand, postIds) {
+async function seedPgComments(users, uid, uname, now, day, rand, postIds, nextId) {
   const commentContents = ['写的太好了！', '学习了', '大佬牛逼！', 'mark 一下', '有没有更详细的教程？', '支持一下', '已收藏', '同求+1', '666', '这个角度我没想到', '涨知识了', '已三连'];
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -268,11 +321,11 @@ async function seedPgComments(users, uid, uname, now, day, rand, postIds) {
     for (let i = 0; i < numComments; i++) {
       const commenter = pick(users);
       const comment = {
-        id: generateId(), postId: post.id, parentId: null, rootId: null,
+        id: nextId++, postId: post.id, userId: commenter.id, parentId: null, rootId: null,
         authorId: commenter.id, authorName: commenter.username, authorAvatar: commenter.avatar,
         content: pick(commentContents), images: '[]',
         likeCount: rand(0, 50), dislikeCount: 0, replyCount: 0,
-        isAuthor: post.authorId === commenter.id, isTop: false, isEssence: false,
+        isAuthor: post.authorId === commenter.id ? 1 : 0, isTop: 0, isEssence: 0,
         replyToUserId: null, replyToUsername: null,
         createdAt: new Date(Date.now() - rand(1, 7) * day).toISOString(),
         updatedAt: now, deletedAt: null,
@@ -288,11 +341,11 @@ async function seedPgComments(users, uid, uname, now, day, rand, postIds) {
       for (let i = 0; i < numReplies; i++) {
         const replier = pick(users);
         const reply = {
-          id: generateId(), postId: post.id, parentId: parent.id, rootId: parent.id,
+          id: nextId++, postId: post.id, userId: replier.id, parentId: parent.id, rootId: parent.id,
           authorId: replier.id, authorName: replier.username, authorAvatar: replier.avatar,
           content: pick(['说得好！', '同意楼上', '补充一点...', '哈哈确实', '涨知识了']),
           images: '[]', likeCount: rand(0, 20), dislikeCount: 0, replyCount: 0,
-          isAuthor: post.authorId === replier.id, isTop: false, isEssence: false,
+          isAuthor: post.authorId === replier.id ? 1 : 0, isTop: 0, isEssence: 0,
           replyToUserId: parent.authorId, replyToUsername: parent.authorName,
           createdAt: new Date(new Date(parent.createdAt).getTime() + (i + 1) * 3600000).toISOString(),
           updatedAt: now, deletedAt: null,
@@ -302,9 +355,10 @@ async function seedPgComments(users, uid, uname, now, day, rand, postIds) {
       }
     }
   }
+  return nextId;
 }
 
-async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, achievementIds, postIds) {
+async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, achievementIds, postIds, nextId) {
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const pid = (i) => postIds[i % postIds.length].id;
   const cid = async (i) => {
@@ -316,21 +370,23 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
   const relPairs = [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[0,1],[0,2],[1,2],[2,1],[3,4],[4,3],[5,1],[5,3],[6,2],[1,5],[2,6],[3,6]];
   for (const [fi, ti] of relPairs) {
     if (uid(fi) === uid(ti)) continue;
-    await repo.insert('user_relationships', { id: generateId(), userId: uid(fi), targetUserId: uid(ti), type: 1, status: 1, createdAt: new Date(Date.now() - rand(1, 30) * day).toISOString(), updatedAt: now, deletedAt: null });
+    const targetId = uid(ti);
+    await repo.insert('user_relationships', { id: nextId++, userId: uid(fi), targetId, targetUserId: targetId, type: 1, status: 1, createdAt: new Date(Date.now() - rand(1, 30) * day).toISOString(), updatedAt: now, deletedAt: null });
     await repo.increment('users', uid(fi), 'followingCount', 1);
     await repo.increment('users', uid(ti), 'followerCount', 1);
   }
 
   // 拉黑
   for (const [fi, ti] of [[1, 3], [4, 6]]) {
-    await repo.insert('user_blocks', { id: generateId(), userId: uid(fi), targetUserId: uid(ti), blockedUserId: uid(ti), createdAt: new Date(Date.now() - rand(3, 5) * day).toISOString() });
+    const blockedId = uid(ti);
+    await repo.insert('user_blocks', { id: nextId++, userId: uid(fi), targetUserId: blockedId, blockedUserId: blockedId, createdAt: new Date(Date.now() - rand(3, 5) * day).toISOString() });
   }
 
   // 资产类型
   const assetTypesData = [
-    { id: 1, name: '积分', unit: '点', icon: '🪙' },
-    { id: 2, name: '金币', unit: '枚', icon: '💰' },
-    { id: 3, name: '经验', unit: 'XP', icon: '⭐' },
+    { id: 1, name: '积分', unit: '点' },
+    { id: 2, name: '金币', unit: '枚' },
+    { id: 3, name: '经验', unit: 'XP' },
   ];
   for (const at of assetTypesData) {
     await repo.insert('asset_types', at);
@@ -340,8 +396,8 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
   for (const u of users) {
     for (const at of assetTypesData) {
       const bal = at.id === 1 ? rand(100, 5000) : at.id === 2 ? rand(10, 500) : rand(50, 2000);
-      await repo.insert('user_assets', { id: generateId(), userId: u.id, typeId: at.id, assetTypeId: at.id, balance: bal, totalEarned: bal, totalConsumed: 0 });
-      await repo.insert('asset_transactions', { id: generateId(), userId: u.id, typeId: at.id, assetTypeId: at.id, type: 1, transactionType: 1, amount: bal, balance: bal, balanceAfter: bal, description: '初始赠送', relatedId: null, relatedBizId: null, createdAt: new Date(Date.now() - rand(1, 10) * day).toISOString() });
+      await repo.insert('user_assets', { id: nextId++, userId: u.id, assetTypeId: at.id, balance: bal });
+      await repo.insert('asset_transactions', { id: nextId++, userId: u.id, assetTypeId: at.id, type: 1, amount: bal, description: '初始赠送' });
     }
   }
 
@@ -352,23 +408,27 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
     { p: [0, 5], msgs: ['管理员你好，有个帖子想举报', '好的，发我链接', '帖子链接在这里...', '已处理，谢谢反馈'] },
   ];
   for (const c of convos) {
-    const convId = generateId();
-    await repo.insert('conversations', { id: convId, type: 1, lastMessage: c.msgs[c.msgs.length - 1], lastMessageAt: new Date(Date.now() - rand(0, 2) * day).toISOString(), createdAt: new Date(Date.now() - 7 * day).toISOString(), deletedAt: null });
+    const convId = nextId++;
+    await repo.insert('conversations', { id: convId, type: 1, lastMessageId: null, lastMessageAt: new Date(Date.now() - rand(0, 2) * day).toISOString(), createdAt: new Date(Date.now() - 7 * day).toISOString(), deletedAt: null });
 
     for (const pi of c.p) {
-      await repo.insert('conversation_participants', { id: generateId(), conversationId: convId, userId: uid(pi), unreadCount: rand(0, 3), joinedAt: new Date(Date.now() - 7 * day).toISOString() });
+      await repo.insert('conversation_participants', { id: nextId++, conversationId: convId, userId: uid(pi), lastReadAt: null });
     }
+    let lastMsgId = null;
     for (let mi = 0; mi < c.msgs.length; mi++) {
-      await repo.insert('messages', { id: generateId(), conversationId: convId, senderId: uid(c.p[mi % 2]), content: c.msgs[mi], type: 1, isRead: mi < c.msgs.length - 1 ? 1 : 0, createdAt: new Date(Date.now() - (c.msgs.length - mi) * 3600000).toISOString(), updatedAt: now, deletedAt: null });
+      const msgId = nextId++;
+      lastMsgId = msgId;
+      await repo.insert('messages', { id: msgId, conversationId: convId, senderId: uid(c.p[mi % 2]), content: c.msgs[mi], type: 1, isRead: mi < c.msgs.length - 1 ? 1 : 0, createdAt: new Date(Date.now() - (c.msgs.length - mi) * 3600000).toISOString(), updatedAt: now, deletedAt: null });
     }
+    await repo.update('conversations', convId, { lastMessageId: lastMsgId });
   }
 
   // 收藏
   for (let i = 0; i < Math.min(4, users.length); i++) {
-    const folderId = generateId();
+    const folderId = nextId++;
     await repo.insert('favorite_folders', { id: folderId, userId: users[i].id, name: ['我的收藏', '技术好文', '精选内容', '灵感集'][i], description: '', sortOrder: i, createdAt: new Date(Date.now() - 10 * day).toISOString() });
     for (let j = 0; j < rand(2, 4); j++) {
-      await repo.insert('favorites', { id: generateId(), userId: users[i].id, folderId, targetType: 1, targetId: pid(i + j), createdAt: new Date(Date.now() - rand(1, 10) * day).toISOString() });
+      await repo.insert('favorites', { id: nextId++, userId: users[i].id, folderId, targetType: 1, targetId: pid(i + j), createdAt: new Date(Date.now() - rand(1, 10) * day).toISOString() });
     }
   }
 
@@ -376,108 +436,92 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
   for (let i = 0; i < 20; i++) {
     const type = (i % 5) + 1;
     const n = {
-      id: generateId(), userId: uid(i), type,
+      id: nextId++, userId: uid(i), type,
       sourceUserId: uid(i + 1),
       title: { 1: '收到点赞', 2: '收到评论', 3: '新增粉丝', 4: '系统通知', 5: '活动通知' }[type],
       content: { 1: `${uname(i + 1)} 赞了你的帖子`, 2: `${uname(i + 2)} 评论了`, 3: `${uname(i + 3)} 关注了你`, 4: '社区规范已更新', 5: '签到活动进行中' }[type],
-      targetType: type <= 2 ? 1 : type === 3 ? 3 : 0,
-      targetId: type <= 2 ? pid(i) : uid(i + 1),
       isRead: Math.random() > 0.4 ? 1 : 0,
-      createdAt: new Date(Date.now() - rand(0, 7) * day).toISOString(), deletedAt: null,
+      createdAt: new Date(Date.now() - rand(0, 7) * day).toISOString(),
     };
     await repo.insert('notifications', n);
   }
 
-  // 审核规则 (type: 1=关键词, 2=正则, 3=AI检测)
+  // 审核规则 (type: 1=关键词, 2=正则, 3=AI检测; action: 1=block, 2=review, 3=warn)
   const modRules = [
-    { type: 1, pattern: '违规广告', action: 'block', status: 1 },
-    { type: 1, pattern: '敏感词', action: 'review', status: 1 },
-    { type: 2, pattern: '\\d{11}', action: 'warn', status: 1 },
+    { type: 1, pattern: '违规广告', action: 1, isEnabled: 1 },
+    { type: 1, pattern: '敏感词', action: 2, isEnabled: 1 },
+    { type: 2, pattern: '\\d{11}', action: 3, isEnabled: 1 },
   ];
   for (const r of modRules) {
-    await repo.insert('moderation_rules', { id: generateId(), ...r, createdAt: new Date(Date.now() - 20 * day).toISOString(), updatedAt: now });
+    await repo.insert('moderation_rules', { id: nextId++, ...r, createdAt: new Date(Date.now() - 20 * day).toISOString(), updatedAt: now });
   }
 
   // 审核记录 (targetType: 1=帖子, 2=评论; type: 1=关键词, 2=正则, 3=AI; status: 1=待审, 2=通过, 3=拒绝)
   const firstCommentId = await cid(0);
   const secondCommentId = await cid(1);
   const modRecords = [
-    { targetType: 1, targetId: pid(0), userId: uid(1), type: 1, status: 2, reason: '人工复核通过' },
-    { targetType: 2, targetId: firstCommentId, userId: uid(3), type: 1, status: 3, reason: '包含违规内容' },
-    { targetType: 1, targetId: pid(4), userId: uid(5), type: 3, status: 1, reason: '疑似AI生成' },
+    { targetType: 1, targetId: pid(0), moderatorId: uid(1), status: 2, reason: '人工复核通过' },
+    { targetType: 2, targetId: firstCommentId, moderatorId: uid(3), status: 3, reason: '包含违规内容' },
+    { targetType: 1, targetId: pid(4), moderatorId: uid(5), status: 1, reason: '疑似AI生成' },
   ];
   for (const r of modRecords) {
     if (r.targetId) {
-      await repo.insert('moderation_records', { id: generateId(), ...r, createdAt: new Date(Date.now() - rand(1, 5) * day).toISOString(), updatedAt: now });
+      await repo.insert('moderation_records', { id: nextId++, ...r, createdAt: new Date(Date.now() - rand(1, 5) * day).toISOString(), updatedAt: now });
     }
   }
 
   // 合集
   const imgs = ['https://picsum.photos/seed/c1/800/600', 'https://picsum.photos/seed/c2/800/600', 'https://picsum.photos/seed/c3/800/600'];
   const collectionsData = [
-    { name: 'AI 入门必读', desc: '精选 AI 学习资源', tags: JSON.stringify(['AI', '教程']) },
-    { name: '年度最佳游戏评测', desc: '2026 年最值得玩的游戏', tags: JSON.stringify(['游戏', '评测']) },
-    { name: '生活美学家', desc: '记录美好生活的点滴', tags: JSON.stringify(['生活', '摄影']) },
+    { name: 'AI 入门必读', desc: '精选 AI 学习资源' },
+    { name: '年度最佳游戏评测', desc: '2026 年最值得玩的游戏' },
+    { name: '生活美学家', desc: '记录美好生活的点滴' },
   ];
   for (let ci = 0; ci < collectionsData.length; ci++) {
     const col = collectionsData[ci];
-    const colId = generateId();
-    await repo.insert('collections', { id: colId, title: col.name, name: col.name, description: col.desc, coverImage: imgs[ci], authorId: uid(ci), userId: uid(ci), authorName: uname(ci), postCount: rand(3, 6), tags: col.tags, viewCount: rand(100, 2000), likeCount: rand(10, 200), status: 1, createdAt: new Date(Date.now() - 15 * day).toISOString(), updatedAt: now, deletedAt: null });
+    const colId = nextId++;
+    await repo.insert('collections', { id: colId, name: col.name, description: col.desc, coverImage: imgs[ci], userId: uid(ci), postCount: rand(3, 6), createdAt: new Date(Date.now() - 15 * day).toISOString(), updatedAt: now });
     for (let j = 0; j < 4; j++) {
-      await repo.insert('collection_posts', { id: generateId(), collectionId: colId, postId: pid(ci * 4 + j), sortOrder: j, addedAt: new Date(Date.now() - rand(1, 10) * day).toISOString() });
-    }
-    for (const t of JSON.parse(col.tags)) {
-      await repo.insert('collection_tags', { id: generateId(), collectionId: colId, tag: t });
+      await repo.insert('collection_posts', { id: nextId++, collectionId: colId, postId: pid(ci * 4 + j), sortOrder: j });
     }
   }
 
   // 直播
-  const liveRoomId = generateId();
-  await repo.insert('live_rooms', { id: liveRoomId, title: 'AI 绘画教学直播', userId: uid(3), username: uname(3), coverImage: imgs[0], streamUrl: '', status: 'live', viewerCount: rand(50, 500), likeCount: rand(100, 1000), startTime: new Date(Date.now() - 2 * 3600000).toISOString(), createdAt: new Date(Date.now() - 2 * 3600000).toISOString(), deletedAt: null });
+  const liveRoomId = nextId++;
+  await repo.insert('live_rooms', { id: liveRoomId, title: 'AI 绘画教学直播', userId: uid(3), coverImage: imgs[0], status: 1, viewCount: rand(50, 500), likeCount: rand(100, 1000), startTime: new Date(Date.now() - 2 * 3600000).toISOString(), createdAt: new Date(Date.now() - 2 * 3600000).toISOString(), updatedAt: now });
 
   const liveMsgs = ['主播好厉害', '666', '请问用的什么工具？', '好看！', '来晚了', '已关注'];
   for (let i = 0; i < liveMsgs.length; i++) {
-    await repo.insert('live_messages', { id: generateId(), roomId: liveRoomId, userId: uid(i), username: uname(i), content: liveMsgs[i], type: 'chat', createdAt: new Date(Date.now() - (liveMsgs.length - i) * 60000).toISOString() });
+    await repo.insert('live_messages', { id: nextId++, roomId: liveRoomId, userId: uid(i), content: liveMsgs[i], type: 1, createdAt: new Date(Date.now() - (liveMsgs.length - i) * 60000).toISOString() });
   }
 
   // 活动/成就进度
   for (const campId of campaignIds) {
     for (let j = 0; j < 3; j++) {
-      await repo.insert('user_campaign_progress', { id: generateId(), campaignId: campId, userId: uid(j), currentCount: rand(0, 5), completed: Math.random() > 0.6, completedAt: Math.random() > 0.6 ? new Date(Date.now() - rand(1, 5) * day).toISOString() : null, joinedAt: new Date(Date.now() - rand(5, 15) * day).toISOString() });
+      const isCompleted = Math.random() > 0.6;
+      await repo.insert('user_campaign_progress', { id: nextId++, campaignId: campId, userId: uid(j), currentProgress: rand(0, 5), isCompleted: isCompleted ? 1 : 0, completedAt: isCompleted ? new Date(Date.now() - rand(1, 5) * day).toISOString() : null, createdAt: new Date(Date.now() - rand(5, 15) * day).toISOString() });
     }
   }
   for (const achId of achievementIds) {
     for (let j = 0; j < 2; j++) {
-      await repo.insert('user_achievements', { id: generateId(), achievementId: achId, userId: uid(j), unlockedAt: new Date(Date.now() - rand(1, 20) * day).toISOString() });
+      await repo.insert('user_achievements', { id: nextId++, achievementId: achId, userId: uid(j), unlockedAt: new Date(Date.now() - rand(1, 20) * day).toISOString() });
     }
   }
 
   // 反馈
-  const feedbackTypes = ['bug', 'feature', 'complaint', 'other'];
+  const feedbackTypes = [1, 2, 3, 4];
   const feedbackContents = ['希望增加暗色模式', '帖子编辑功能有 bug', '建议增加帖子分类筛选', '举报处理速度太慢了', '希望能支持图片拖拽上传'];
   for (let i = 0; i < 5; i++) {
-    await repo.insert('feedbacks', { id: generateId(), userId: uid(i), type: feedbackTypes[i % feedbackTypes.length], title: feedbackContents[i].substring(0, 20), content: feedbackContents[i], status: ['pending', 'processing', 'resolved', 'closed', 'pending'][i], adminReply: i === 2 ? '已收到，计划下个版本实现' : null, createdAt: new Date(Date.now() - rand(1, 15) * day).toISOString(), updatedAt: now, deletedAt: null });
+    await repo.insert('feedbacks', { id: nextId++, userId: uid(i), type: feedbackTypes[i % feedbackTypes.length], title: feedbackContents[i].substring(0, 20), content: feedbackContents[i], status: [1, 2, 3, 4, 1][i], adminReply: i === 2 ? '已收到，计划下个版本实现' : null, createdAt: new Date(Date.now() - rand(1, 15) * day).toISOString(), updatedAt: now });
   }
 
   // 必看列表
   for (let i = 0; i < 5; i++) {
     const post = postIds[i % postIds.length];
-    await repo.insert('must_see_list', { id: generateId(), targetType: 'post', targetId: post.id, postId: post.id, title: post.title, coverImage: post.coverImage, description: (post.summary || '').substring(0, 100), sortOrder: i, addedBy: 'admin001', createdBy: 'admin001', createdAt: new Date(Date.now() - rand(1, 10) * day).toISOString(), deletedAt: null });
+    await repo.insert('must_see_list', { id: nextId++, postId: post.id, sortOrder: i, createdBy: 'admin001', createdAt: new Date(Date.now() - rand(1, 10) * day).toISOString(), deletedAt: null });
   }
 
-  // 审计日志
-  const auditActions = [
-    { action: 'user_ban', targetType: 'user', description: '禁用用户账号', targetId: uid(1) },
-    { action: 'post_delete', targetType: 'post', description: '删除违规帖子', targetId: pid(2) },
-    { action: 'config_update', targetType: 'system', description: '更新系统配置', targetId: pid(3) },
-    { action: 'moderation_approve', targetType: 'comment', description: '审核通过评论', targetId: firstCommentId },
-  ];
-  for (let i = 0; i < auditActions.length; i++) {
-    const al = auditActions[i];
-    if (al.targetId) {
-      await repo.insert('audit_logs', { id: generateId(), operatorId: 'admin001', operatorName: 'admin', ...al, ip: '127.0.0.1', createdAt: new Date(Date.now() - (auditActions.length - i) * day).toISOString() });
-    }
-  }
+  
 
   // 初始化排行榜数据
   try {
@@ -488,6 +532,7 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
   }
 
   console.log('Full PG seed complete');
+  return nextId;
 }
 
 export default initDatabase;

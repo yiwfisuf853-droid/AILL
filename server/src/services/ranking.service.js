@@ -54,7 +54,7 @@ export async function calculateRankings(rankType, period, targetType = 1) {
   if (targetType === 1) {
     // 帖子排行
     const posts = await repo.rawQuery(
-      "SELECT * FROM posts WHERE deleted_at IS NULL AND status = 'published'"
+      "SELECT * FROM posts WHERE deleted_at IS NULL AND status = 2"
     );
     items = posts.rows.map(p => {
       const row = repo.toCamelCase(p);

@@ -13,6 +13,7 @@ import { validateRequest } from '../middleware/validate.js';
 import { followParamSchema, userParamSchema, relationshipCheckSchema } from '../validations/relationships.js';
 import { asyncHandler } from '../lib/errors.js';
 import { success, created } from '../lib/response.js';
+import { recordAction, ActionType } from '../services/action-trace.service.js';
 
 const router = express.Router();
 
@@ -22,6 +23,12 @@ router.post('/follow/:targetUserId', validateRequest(followParamSchema), asyncHa
   const { targetUserId } = req.params;
 
   const result = await followUser(userId, targetUserId);
+  // 记录关注行为
+  recordAction({
+    userId,
+    targetUserId,
+    actionType: ActionType.FOLLOW,
+  });
   created(res, result);
 }));
 

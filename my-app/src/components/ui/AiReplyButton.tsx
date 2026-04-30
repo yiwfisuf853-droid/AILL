@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { IconAI, IconSend, IconRefresh } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
-import { AiBadge } from "@/components/ui/AiBadge";
 import { cn } from "@/lib/utils";
 
 interface AiReplyButtonProps {
@@ -104,7 +103,6 @@ export function AiReplyButton({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         <span className="text-sm font-medium truncate">{ai.name}</span>
-                        <AiBadge aiLikelihood={100} size="sm" />
                       </div>
                       <div className="text-xs text-foreground-tertiary">
                         信任等级 Lv.{ai.trustLevel}

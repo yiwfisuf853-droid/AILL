@@ -682,3 +682,136 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
     token text PRIMARY KEY,
     revoked_at timestamptz DEFAULT NOW()
 );
+
+-- 用户行为追踪（影响力计算数据源）
+CREATE TABLE IF NOT EXISTS user_action_traces (
+    id text PRIMARY KEY,
+    user_id text NOT NULL,
+    post_id text,
+    target_user_id text,
+    action_type int NOT NULL,  -- 1浏览 2点赞 3收藏 4打赏 5举报 6分享 7关注
+    amount numeric(10,2) DEFAULT 0,
+    reason varchar(500),
+    session_duration int,       -- 浏览停留秒数
+    created_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_action_traces_user ON user_action_traces(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_action_traces_post ON user_action_traces(post_id);
+CREATE INDEX IF NOT EXISTS idx_user_action_traces_type ON user_action_traces(action_type);
+CREATE INDEX IF NOT EXISTS idx_user_action_traces_created ON user_action_traces(created_at);
+
+-- API 审计日志（记录 AI 通过 API 的所有操作）
+CREATE TABLE IF NOT EXISTS api_audit_logs (
+    id text PRIMARY KEY,
+    user_id text NOT NULL,
+    api_key_id text,
+    endpoint varchar(200) NOT NULL,
+    method varchar(10) NOT NULL,
+    request_params jsonb,
+    response_status int NOT NULL,
+    duration_ms int,
+    created_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_api_audit_user ON api_audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_audit_created ON api_audit_logs(created_at);
+
+-- AI 平台配置（存储 AI 用户的第三方 API 配置）
+CREATE TABLE IF NOT EXISTS ai_platform_configs (
+    id text PRIMARY KEY,
+    user_id text NOT NULL UNIQUE,
+    platform varchar(50) NOT NULL,
+    api_key_hash text NOT NULL,
+    api_base_url varchar(500),
+    model_name varchar(100),
+    extra_config jsonb,
+    status int DEFAULT 1,
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_platform_configs_user ON ai_platform_configs(user_id);
+
+-- 帖子编辑历史
+CREATE TABLE IF NOT EXISTS post_edit_histories (
+    id text PRIMARY KEY,
+    post_id text NOT NULL,
+    editor_id text NOT NULL,
+    title_before text,
+    title_after text,
+    content_before text,
+    content_after text,
+    edit_reason varchar(200),
+    created_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_post_edit_histories_post ON post_edit_histories(post_id, created_at DESC);
+
+-- 热点话题
+CREATE TABLE IF NOT EXISTS hot_topics (
+    id text PRIMARY KEY,
+    title varchar(100) NOT NULL,
+    description text,
+    heat_score int DEFAULT 0,
+    status smallint DEFAULT 1,
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW()
+);
+
+-- 帖子-热点关联
+CREATE TABLE IF NOT EXISTS post_hot_affiliations (
+    id text PRIMARY KEY,
+    post_id text NOT NULL,
+    hot_topic_id text NOT NULL,
+    created_at timestamptz DEFAULT NOW(),
+    UNIQUE (post_id, hot_topic_id)
+);
+CREATE INDEX IF NOT EXISTS idx_post_hot_affiliations_topic ON post_hot_affiliations(hot_topic_id);
+
+-- 资产规则引擎
+CREATE TABLE IF NOT EXISTS asset_rules (
+    id text PRIMARY KEY,
+    name varchar(100) NOT NULL,
+    description text,
+    event_type varchar(50) NOT NULL,
+    conditions jsonb NOT NULL DEFAULT '{}',
+    rewards jsonb NOT NULL DEFAULT '{}',
+    status smallint DEFAULT 1,
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW()
+);
+
+-- 直播回放
+CREATE TABLE IF NOT EXISTS live_recordings (
+    id text PRIMARY KEY,
+    room_id text NOT NULL,
+    url varchar(500) NOT NULL,
+    duration int,
+    file_size bigint,
+    status smallint DEFAULT 1,
+    created_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_live_recordings_room ON live_recordings(room_id);
+
+-- 帖子-分区关联
+CREATE TABLE IF NOT EXISTS post_sections (
+    id text PRIMARY KEY,
+    post_id text NOT NULL,
+    section_id text NOT NULL,
+    created_at timestamptz DEFAULT NOW(),
+    UNIQUE (post_id, section_id)
+);
+CREATE INDEX IF NOT EXISTS idx_post_sections_section ON post_sections(section_id);
+
+-- AI 访问策略
+CREATE TABLE IF NOT EXISTS ai_access_policies (
+    id text PRIMARY KEY,
+    ai_user_id text NOT NULL,
+    name varchar(100) NOT NULL,
+    conditions jsonb DEFAULT '{}',
+    reason text,
+    status smallint DEFAULT 1,
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_access_policies_user ON ai_access_policies(ai_user_id, status);
+
+-- AI 记忆表增加大小字段
+ALTER TABLE ai_memories ADD COLUMN IF NOT EXISTS size_bytes int DEFAULT 0;

@@ -22,8 +22,9 @@ export function MemoryDrawer({ open, onClose }: MemoryDrawerProps) {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const res = await aiApi.getMemories(user.id, search ? { keyword: search } : {});
-      setMemories(res.list || []);
+      const res: any = await aiApi.getMemories(user.id, search ? { keyword: search } : {});
+      const memList = res.list || res || [];
+      setMemories(Array.isArray(memList) ? memList : []);
     } catch {
       // ignore
     } finally {

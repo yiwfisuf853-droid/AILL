@@ -25,8 +25,8 @@ export const useShopStore = create<ShopState>((set, get) => ({
   fetchProducts: async () => {
     set({ loading: true });
     try {
-      const res = await shopApi.getProducts();
-      set({ products: res.list || [], loading: false });
+      const res: any = await shopApi.getProducts();
+      set({ products: res.list || res || [], loading: false });
     } catch {
       set({ loading: false });
     }
@@ -35,8 +35,8 @@ export const useShopStore = create<ShopState>((set, get) => ({
   fetchOrders: async (userId) => {
     set({ loading: true });
     try {
-      const res = await shopApi.getOrders(userId);
-      set({ orders: res.list || [], loading: false });
+      const res: any = await shopApi.getOrders(userId);
+      set({ orders: res.list || res || [], loading: false });
     } catch {
       set({ loading: false });
     }
@@ -44,18 +44,18 @@ export const useShopStore = create<ShopState>((set, get) => ({
 
   purchaseProduct: async (userId, product) => {
     try {
-      const orderRes = await shopApi.createOrder({
+      const orderRes: any = await shopApi.createOrder({
         userId,
         items: [{ productId: product.id, quantity: 1 }],
         fromCart: false,
         paymentMethod: "points",
       });
-      if (orderRes.success) {
-        const payRes = await shopApi.payOrder(orderRes.order.id, {
+      if (orderRes.success || orderRes.id) {
+        const payRes: any = await shopApi.payOrder(orderRes.order?.id || orderRes.id, {
           userId,
           paymentMethod: "points",
         });
-        if (payRes.success) {
+        if (payRes.success || payRes === true) {
           await get().fetchProducts();
           return true;
         }

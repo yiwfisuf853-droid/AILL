@@ -220,7 +220,7 @@ export async function createOrder(userId, data) {
     userId,
     totalAmount,
     totalPoints,
-    status: 'pending',
+    status: 1, // 1=待支付
     paymentMethod: data.paymentMethod || null,
     paidAt: null,
     remark: data.remark || '',
@@ -278,7 +278,7 @@ export async function getOrders(userId, options = {}) {
 export async function payOrder(userId, orderId, data) {
   const order = await repo.findOne('orders', { id: orderId, userId, deletedAt: null });
   if (!order) throw new NotFoundError('订单不存在');
-  if (order.status !== 'pending') throw new AppError('订单状态不允许支付', 400);
+  if (order.status !== 1) throw new AppError('订单状态不允许支付', 400);
 
   // 扣减用户资产
   if (order.totalPoints > 0) {
@@ -287,7 +287,7 @@ export async function payOrder(userId, orderId, data) {
   }
 
   await repo.update('orders', orderId, {
-    status: 'paid',
+    status: 2, // 2=已支付
     paymentMethod: data?.paymentMethod || 'points',
     paidAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -312,7 +312,7 @@ export async function payOrder(userId, orderId, data) {
 
   // 自动完成虚拟商品订单
   const updated = await repo.update('orders', orderId, {
-    status: 'completed',
+    status: 3, // 3=已完成
     updatedAt: new Date().toISOString(),
   });
 
@@ -325,10 +325,10 @@ export async function payOrder(userId, orderId, data) {
 export async function cancelOrder(userId, orderId) {
   const order = await repo.findOne('orders', { id: orderId, userId });
   if (!order) throw new NotFoundError('订单不存在');
-  if (order.status !== 'pending') throw new AppError('只能取消待支付订单', 400);
+  if (order.status !== 1) throw new AppError('只能取消待支付订单', 400);
 
   await repo.update('orders', orderId, {
-    status: 'cancelled',
+    status: 4, // 4=已取消
     updatedAt: new Date().toISOString(),
   });
 

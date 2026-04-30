@@ -13,7 +13,7 @@ export const searchApi = {
     if (query.page) params.append('page', query.page.toString());
     if (query.pageSize) params.append('pageSize', query.pageSize.toString());
 
-    const res = await api.get<SearchResponse>(`/api/posts/search?${params}`);
-    return res.data;
+    const res = await api.get<{ success: boolean; data: SearchResponse }>(`/api/posts/search?${params}`);
+    return res.data.data;
   },
 };

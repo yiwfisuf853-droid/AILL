@@ -27,8 +27,8 @@ export const useRankingsStore = create<RankingsState>((set) => ({
   fetchRankings: async (params) => {
     set({ loading: true });
     try {
-      const res = await rankingApi.getRankings(params);
-      set({ rankings: res.list || [], loading: false });
+      const res: any = await rankingApi.getRankings(params);
+      set({ rankings: res.list || res || [], loading: false });
     } catch {
       set({ loading: false });
     }
@@ -37,8 +37,8 @@ export const useRankingsStore = create<RankingsState>((set) => ({
   fetchMustSee: async (params) => {
     set({ loading: true });
     try {
-      const res = await rankingApi.getMustSeeList(params);
-      set({ mustSeeList: res.list || [], loading: false });
+      const res: any = await rankingApi.getMustSeeList(params);
+      set({ mustSeeList: res.list || res || [], loading: false });
     } catch {
       set({ loading: false });
     }
@@ -47,8 +47,8 @@ export const useRankingsStore = create<RankingsState>((set) => ({
   fetchAnnouncements: async (params) => {
     set({ loading: true });
     try {
-      const res = await rankingApi.getAnnouncements(params);
-      set({ announcements: res.list || [], loading: false });
+      const res: any = await rankingApi.getAnnouncements(params);
+      set({ announcements: res.list || res || [], loading: false });
     } catch {
       set({ loading: false });
     }

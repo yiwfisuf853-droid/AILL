@@ -52,9 +52,9 @@ export function CollectionDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await collectionApi.getCollectionDetail(id);
-      if (res.success) {
-        setData({ collection: res.collection, posts: res.posts || [] });
+      const res: any = await collectionApi.getCollectionDetail(id);
+      if (res.success || res.id) {
+        setData({ collection: res.collection || res, posts: res.posts || [] });
       } else {
         setError('加载合集失败');
       }
@@ -71,8 +71,8 @@ export function CollectionDetailPage() {
   async function handleDeleteCollection() {
     if (!id) return;
     try {
-      const res = await collectionApi.deleteCollection(id);
-      if (res.success) {
+      const res: any = await collectionApi.deleteCollection(id);
+      if (res.success || res === true) {
         navigate('/collections');
       } else {
         toast.error('删除失败');
@@ -86,8 +86,8 @@ export function CollectionDetailPage() {
     if (!id || !addPostId.trim()) return;
     setSubmitting(true);
     try {
-      const res = await collectionApi.addPostToCollection(id, { postId: addPostId.trim() });
-      if (res.success) {
+      const res: any = await collectionApi.addPostToCollection(id, { postId: addPostId.trim() });
+      if (res.success || res === true) {
         setShowAddModal(false);
         setAddPostId('');
         loadData();
@@ -104,8 +104,8 @@ export function CollectionDetailPage() {
     if (!id) return;
     setRemovingId(postId);
     try {
-      const res = await collectionApi.removePostFromCollection(id, postId);
-      if (res.success) {
+      const res: any = await collectionApi.removePostFromCollection(id, postId);
+      if (res.success || res === true) {
         loadData();
       } else {
         toast.error('移除帖子失败');

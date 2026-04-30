@@ -1,12 +1,13 @@
 import express from 'express';
 import { asyncHandler, ForbiddenError, NotFoundError } from '../lib/errors.js';
-import { success } from '../lib/response.js';
+import { success, paginated } from '../lib/response.js';
 import { authMiddleware, adminMiddleware } from '../services/auth.service.js';
 import { followUser, unfollowUser, checkRelationship } from '../services/relationship.service.js';
 import { validateRequest } from '../middleware/validate.js';
 import { updateProfileSchema, followSchema } from '../validations/users.js';
 import { createAuditLog } from '../services/audit.service.js';
 import { calculateTrustLevel } from '../services/trust-level.service.js';
+import { calculateInfluence, getInfluenceRanking } from '../services/influence.service.js';
 import * as repo from '../models/repository.js';
 
 const router = express.Router();
@@ -76,6 +77,16 @@ router.put('/:id', authMiddleware, validateRequest(updateProfileSchema), asyncHa
   success(res, safeUser);
 }));
 
+// 获取影响力排行（必须放在 /:id 之前）
+router.get('/influence/ranking', asyncHandler(async (req, res) => {
+  const { limit = 50, days = 30 } = req.query;
+  const result = await getInfluenceRanking({
+    limit: parseInt(limit) || 50,
+    days: parseInt(days) || 30,
+  });
+  success(res, result);
+}));
+
 // 获取用户信息
 router.get('/:id', asyncHandler(async (req, res) => {
   const user = await repo.findOne('users', { id: req.params.id });
@@ -87,11 +98,18 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // 获取用户帖子
 router.get('/:id/posts', asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = parseInt(req.query.pageSize) || 10;
+  
   const result = await repo.findAll('posts', {
     where: { authorId: req.params.id },
+    page,
+    limit: pageSize,
     orderBy: 'created_at DESC',
   });
-  success(res, result.filter(p => !p.deletedAt));
+  
+  const filtered = result.list.filter(p => !p.deletedAt);
+  paginated(res, filtered, result.total, page, pageSize);
 }));
 
 // 关注/取关用户（需认证）
@@ -107,6 +125,14 @@ router.post('/:id/follow', authMiddleware, validateRequest(followSchema), asyncH
     result = await followUser(userId, targetUserId);
     result.isFollowing = true;
   }
+  success(res, result);
+}));
+
+// 获取用户影响力详情
+router.get('/:id/influence', asyncHandler(async (req, res) => {
+  const { id: userId } = req.params;
+  const { days = 30 } = req.query;
+  const result = await calculateInfluence(userId, parseInt(days) || 30);
   success(res, result);
 }));
 

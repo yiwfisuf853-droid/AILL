@@ -3,19 +3,20 @@ import { toast } from '@/components/ui/Toast';
 import { useAiStore } from '@/features/ai/store';
 import { useAuthStore } from '@/features/auth/store';
 import { isApiError } from '@/lib/api';
+import api from '@/lib/api';
 import { SECTIONS, SECTION_MAP } from '@/lib/navConfig';
 import { MarkdownPreview } from '@/components/ui/MarkdownEditor';
 import {
   IconAI, IconPlus, IconLock, IconClose, IconDelete, IconEye, IconClock,
-  IconShare, IconEdit, IconHeart, IconComment, IconBookOpen, IconSend,
+  IconShare, IconEdit, IconHeart, IconComment, IconBookOpen, IconSend, IconSave,
 } from '@/components/ui/Icon';
-import api from '@/lib/api';
 
-type TabKey = 'overview' | 'create' | 'apiMemory';
+type TabKey = 'overview' | 'create' | 'drafts' | 'apiMemory';
 
 const tabConfig: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'overview', label: '概览', icon: IconAI },
   { key: 'create', label: '快速创作', icon: IconEdit },
+  { key: 'drafts', label: '草稿箱', icon: IconSave },
   { key: 'apiMemory', label: 'API & 记忆', icon: IconLock },
 ];
 
@@ -30,7 +31,7 @@ interface AiStats {
 export function AiProfilePage() {
   const { user } = useAuthStore();
   const userId = user?.id || '';
-  const { activeTab, setActiveTab, loading, apiKeys, showKeyMap, newKeyName, creatingKey, memories, newMemory, storingMemory, fetchData, createApiKey, revokeApiKey, storeMemory, deleteMemory, toggleKeyVisibility, setNewKeyName, setNewMemory } = useAiStore();
+  const { activeTab, setActiveTab, loading, apiKeys, showKeyMap, newKeyName, creatingKey, memories, newMemory, storingMemory, drafts, draftsLoading, fetchData, createApiKey, revokeApiKey, storeMemory, deleteMemory, toggleKeyVisibility, setNewKeyName, setNewMemory, saveDraft, publishDraft, deleteDraft } = useAiStore();
 
   const [stats, setStats] = useState<AiStats>({ todayPosts: 0, weekPosts: 0, totalPosts: 0, subscribers: 0, recentPosts: [] });
   const [createForm, setCreateForm] = useState({ title: '', content: '', sectionId: '', tags: '' });
@@ -59,6 +60,47 @@ export function AiProfilePage() {
       } catch {}
       setStats({ todayPosts, weekPosts, totalPosts: total, subscribers, recentPosts: posts });
     } catch {}
+  }
+
+  async function handlePublishDraft(postId: string) {
+    try {
+      await publishDraft(postId, userId);
+      toast.success('已发布');
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '发布失败');
+    }
+  }
+
+  async function handleDeleteDraft(postId: string) {
+    try {
+      await deleteDraft(postId, userId);
+      toast.success('已删除');
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '删除失败');
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (!createForm.title.trim() || !createForm.content.trim()) {
+      toast.error('标题和内容不能为空');
+      return;
+    }
+    setCreating(true);
+    try {
+      const tags = createForm.tags ? createForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+      await saveDraft({
+        title: createForm.title,
+        content: createForm.content,
+        sectionId: createForm.sectionId || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      toast.success('已保存为草稿');
+      setCreateForm({ title: '', content: '', sectionId: '', tags: '' });
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '保存失败');
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleCreatePost() {
@@ -241,7 +283,7 @@ export function AiProfilePage() {
                     </div>
                   </div>
                 )}
-                <div data-name="aiProfileCreateSubmitRow" className="pt-2">
+                <div data-name="aiProfileCreateSubmitRow" className="pt-2 flex gap-3">
                   <button data-name="aiStudioCreateSubmitBtn" onClick={handleCreatePost} disabled={creating || !createForm.title.trim() || !createForm.content.trim()}
                     className="px-8 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 transition-all flex items-center gap-2">
                     {creating ? (
@@ -250,7 +292,62 @@ export function AiProfilePage() {
                       <><IconSend size={16} />发布</>
                     )}
                   </button>
+                  <button data-name="aiStudioCreateDraftBtn" onClick={handleSaveDraft} disabled={creating || !createForm.title.trim() || !createForm.content.trim()}
+                    className="px-6 py-3 rounded-xl text-sm font-medium bg-muted border border-border text-foreground-secondary hover:bg-muted/80 disabled:opacity-50 transition-all flex items-center gap-2">
+                    <IconSave size={16} />存为草稿
+                  </button>
                 </div>
+              </div>
+            )}
+
+            {/* ===== Drafts Tab ===== */}
+            {activeTab === 'drafts' && (
+              <div data-name="aiProfileDrafts" className="space-y-4 max-w-2xl">
+                <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
+                  <IconSave size={16} className="text-violet-400" />草稿箱
+                </h3>
+                {draftsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : drafts.length === 0 ? (
+                  <div className="text-center py-12 text-foreground-tertiary text-sm">
+                    暂无草稿，在「快速创作」中保存草稿
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {drafts.map((draft: any) => {
+                      const section = SECTION_MAP[draft.sectionId];
+                      return (
+                        <div key={draft.id} data-name={`aiStudioDraft${draft.id}`}
+                          className="group p-3 rounded-xl bg-background-elevated border border-border/40 hover:border-border transition-colors">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium text-foreground truncate">{draft.title}</h4>
+                              <p className="text-xs text-foreground-tertiary mt-1 line-clamp-2">{draft.summary || draft.content?.substring(0, 100)}</p>
+                              <div className="flex items-center gap-2 mt-2 text-xs text-foreground-tertiary">
+                                {section && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">{section.name}</span>}
+                                <span className="flex items-center gap-0.5"><IconClock size={10} />{new Date(draft.createdAt).toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handlePublishDraft(draft.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors flex items-center gap-1"
+                                data-name={`aiStudioDraft${draft.id}PublishBtn`}>
+                                <IconSend size={12} />发布
+                              </button>
+                              <button onClick={() => handleDeleteDraft(draft.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors flex items-center gap-1"
+                                data-name={`aiStudioDraft${draft.id}DeleteBtn`}>
+                                <IconDelete size={12} />删除
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

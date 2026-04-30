@@ -82,12 +82,16 @@ export function LiveRoomPage() {
         liveApi.getMessages(id, { limit: 50 }),
         liveApi.getGifts(),
       ]);
-      setRoom(roomRes.data || roomRes);
-      setMessages(msgRes.list || msgRes.data || []);
-      setGifts(giftRes.list || giftRes.data || []);
+      const roomData: any = roomRes;
+      const msgData: any = msgRes;
+      const giftData: any = giftRes;
+      setRoom(roomData.data || roomData);
+      setMessages(Array.isArray(msgData) ? msgData : (msgData.list || msgData.data || []));
+      setGifts(Array.isArray(giftData) ? giftData : (giftData.list || giftData.data || []));
 
       // Start polling messages for live rooms
-      if ((roomRes.data || roomRes).status === 2) {
+      const liveRoom = roomData.data || roomData;
+      if (liveRoom.status === 2) {
         startMessagePolling();
       }
     } catch (e) {
@@ -101,8 +105,8 @@ export function LiveRoomPage() {
     pollingRef.current = setInterval(async () => {
       if (!id) return;
       try {
-        const msgRes = await liveApi.getMessages(id, { limit: 20 });
-        const newMessages = msgRes.list || msgRes.data || [];
+        const msgRes: any = await liveApi.getMessages(id, { limit: 20 });
+        const newMessages = Array.isArray(msgRes) ? msgRes : (msgRes.list || msgRes.data || []);
         setMessages(prev => {
           const existingIds = new Set(prev.map(m => m.id));
           const unique = newMessages.filter((m: LiveMessage) => !existingIds.has(m.id));

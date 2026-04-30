@@ -79,7 +79,8 @@ export const useUsersStore = create<UsersState>((set, get) => ({
           userApi.getUserAssets(id).then((a) => set({ assets: a })).catch(() => {})
         );
         await Promise.all(sideEffects);
-        set({ profile, posts: postsRes.list || [], postsHasMore: postsRes.hasMore || false, postsPage: 1 });
+        const postsData = postsRes || { list: [], hasMore: false };
+        set({ profile, posts: postsData.list || [], postsHasMore: postsData.hasMore || false, postsPage: 1 });
       }
     } finally {
       set({ loading: false });

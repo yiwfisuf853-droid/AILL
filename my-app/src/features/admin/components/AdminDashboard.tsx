@@ -289,8 +289,8 @@ function UsersTab() {
 
   const handleToggleStatus = async (id: string) => {
     try {
-      const updated = await adminApi.toggleUserStatus(id);
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: updated.status } : u)));
+      const updated: any = await adminApi.toggleUserStatus(id);
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: updated.status ?? (u.status === 1 ? 0 : 1) } : u)));
     } catch {}
   };
 
@@ -421,8 +421,8 @@ function ModerationTab() {
   const loadRules = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.getModerationRules();
-      setRules(res.list || []);
+      const res: any = await adminApi.getModerationRules();
+      setRules(res.list || res || []);
     } catch {
       setRules([]);
     }
@@ -434,8 +434,8 @@ function ModerationTab() {
     try {
       const params: Record<string, any> = {};
       if (statusFilter !== 'all') params.status = statusFilter;
-      const res = await adminApi.getModerationRecords(params);
-      setRecords(res.list || []);
+      const res: any = await adminApi.getModerationRecords(params);
+      setRecords(res.list || res || []);
     } catch {
       setRecords([]);
     }
@@ -905,8 +905,8 @@ function AnnouncementsTab() {
 
   const loadAnnouncements = async () => {
     try {
-      const res = await adminApi.getAnnouncements();
-      setAnnouncements(res.list || []);
+      const res: any = await adminApi.getAnnouncements();
+      setAnnouncements(res.list || res || []);
     } catch {
       setAnnouncements([
         { id: '1', title: '系统升级通知', content: '系统将于今晚进行升级维护', type: 1, priority: 1, startTime: null, endTime: null, isSticky: 1, status: 1, createdBy: 'admin', createdAt: '2025-06-10', updatedAt: '2025-06-10' },
@@ -1123,8 +1123,8 @@ function SecurityTab() {
   const loadBlacklist = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.getIpBlacklist();
-      setBlacklist(res.list || []);
+      const res: any = await adminApi.getIpBlacklist();
+      setBlacklist(res.list || res || []);
     } catch {
       setBlacklist([
         { id: '1', ip: '192.168.1.100', reason: '恶意请求', createdBy: 'admin', createdAt: '2025-06-10' },
@@ -1137,8 +1137,8 @@ function SecurityTab() {
   const loadRisks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.getRiskAssessments();
-      setRisks(res.list || []);
+      const res: any = await adminApi.getRiskAssessments();
+      setRisks(res.list || res || []);
     } catch {
       setRisks([
         { id: '1', userId: 'u-101', riskType: 'login', riskLevel: 3, description: '异地登录', createdAt: '2025-06-10 14:30' },
@@ -1366,11 +1366,11 @@ function ConfigTab() {
   const loadConfig = async () => {
     setLoading(true);
     try {
-      const res = await adminApi.getSystemConfig();
+      const res: any = await adminApi.getSystemConfig();
       // API 可能返回对象或数组，做兼容处理
       if (Array.isArray(res)) {
         setConfigs(res);
-      } else if (res.list) {
+      } else if (res && res.list) {
         setConfigs(res.list);
       } else if (typeof res === 'object') {
         // 如果返回的是 key-value 对象，转为数组

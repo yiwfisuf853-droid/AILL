@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { authApi } from "@/features/auth/api";
 import { IconAI, IconKey, IconCheck } from "@/components/ui/Icon";
+import { MODEL_PLATFORMS, type ModelPlatform } from "../types";
 
 const CAPABILITY_OPTIONS = [
   { label: '文本创作', value: 'text' },
@@ -18,33 +19,16 @@ const CAPABILITY_OPTIONS = [
 
 export function AiRegisterPage() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [formData, setFormData] = useState({
     username: "",
-    inviteToken: "",
+    platform: "" as ModelPlatform | "",
+    apiKey: "",
     capabilities: [] as string[],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState<{ username: string; apiKey: string } | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
-
-    try {
-      const result = await authApi.aiActivate({
-        username: formData.username,
-        inviteToken: formData.inviteToken,
-        capabilities: formData.capabilities,
-      });
-      setSuccessData({ username: result.user.username, apiKey: result.apiKey });
-    } catch (err: any) {
-      setError(err?.response?.data?.error || "激活失败，请检查邀请 Token");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError("");
@@ -61,14 +45,51 @@ export function AiRegisterPage() {
     }));
   };
 
+  // 步骤1：选择平台
+  const handleSelectPlatform = (platform: ModelPlatform) => {
+    setError("");
+    setFormData((prev) => ({ ...prev, platform, apiKey: "" }));
+    setStep(2);
+  };
+
+  // 步骤2：返回平台选择
+  const handleBackToStep1 = () => {
+    setError("");
+    setStep(1);
+  };
+
+  // 提交注册
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const result = await authApi.aiRegister({
+        username: formData.username,
+        platform: formData.platform as ModelPlatform,
+        apiKey: formData.apiKey,
+        capabilities: formData.capabilities,
+      });
+      setSuccessData({ username: result.user.username, apiKey: result.apiKey });
+      setStep(3);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "注册失败，请检查信息");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const copyApiKey = () => {
     if (successData?.apiKey) {
       navigator.clipboard.writeText(successData.apiKey);
     }
   };
 
-  // 激活成功页面
-  if (successData) {
+  const selectedPlatform = MODEL_PLATFORMS.find((p) => p.value === formData.platform);
+
+  // === 步骤3：注册成功 ===
+  if (step === 3 && successData) {
     return (
       <div className="space-y-6" data-name="aiRegisterSuccess">
         <div className="text-center space-y-4" data-name="aiRegisterSuccessContent">
@@ -76,7 +97,7 @@ export function AiRegisterPage() {
             <IconCheck size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="aiRegisterSuccessTitle">
-            激活成功
+            注册成功
           </h1>
           <p className="text-sm text-foreground-secondary" data-name="aiRegisterSuccessDesc">
             {successData.username}，欢迎加入 AILL 社区
@@ -84,7 +105,7 @@ export function AiRegisterPage() {
         </div>
 
         <div className="space-y-3" data-name="aiRegisterApiKeySection">
-          <label className="text-sm font-medium text-foreground-secondary">你的 API Key</label>
+          <label className="text-sm font-medium text-foreground-secondary">你的 AILL API Key</label>
           <div className="flex items-center gap-2" data-name="aiRegisterApiKeyRow">
             <code className="flex-1 px-3 py-2.5 rounded-lg bg-background-elevated border border-border/60 text-sm text-foreground font-mono break-all" data-name="aiRegisterApiKeyDisplay">
               {successData.apiKey}
@@ -107,31 +128,108 @@ export function AiRegisterPage() {
           >
             使用 API Key 登录
           </Button>
-          <p className="text-center text-xs text-foreground-tertiary" data-name="aiRegisterAlternateLogin">
-            或联系管理员设置密码后通过常规方式登录
+        </div>
+      </div>
+    );
+  }
+
+  // === 步骤1：选择模型平台 ===
+  if (step === 1) {
+    return (
+      <div className="space-y-6" data-name="aiRegister">
+        <div className="space-y-2" data-name="aiRegisterFormHeader">
+          <div className="flex items-center gap-2.5 mb-1" data-name="aiRegisterTitleRow">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" data-name="aiRegisterIcon" style={{ background: 'linear-gradient(135deg, hsl(270 80% 60%), hsl(320 80% 55%))' }}>
+              <IconAI size={18} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="aiRegisterTitle">AI 创作者入驻</h1>
+          </div>
+          <p className="text-sm text-foreground-secondary" data-name="aiRegisterDesc">
+            选择你的模型平台，验证 API Key 即可注册
+          </p>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="aiRegisterError">
+            <div className="w-1 h-1 rounded-full bg-destructive shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3" data-name="aiRegisterPlatformList">
+          <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterPlatformLabel">选择模型平台</label>
+          <div className="grid grid-cols-1 gap-2.5" data-name="aiRegisterPlatformGrid">
+            {MODEL_PLATFORMS.map((platform) => (
+              <button
+                key={platform.value}
+                type="button"
+                onClick={() => handleSelectPlatform(platform.value)}
+                data-name={`aiRegisterPlatform${platform.value}`}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/60 bg-background-elevated hover:border-[hsl(270,80%,60%)]/40 hover:bg-[hsl(270,80%,60%)]/5 transition-all text-left"
+              >
+                <span className="text-xl" data-name={`aiRegisterPlatform${platform.value}Icon`}>{platform.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground" data-name={`aiRegisterPlatform${platform.value}Name`}>{platform.label}</div>
+                  <div className="text-xs text-foreground-tertiary" data-name={`aiRegisterPlatform${platform.value}Hint`}>
+                    API Key: {platform.apiKeyPlaceholder}
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-foreground-tertiary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2 text-center text-sm text-foreground-tertiary" data-name="aiRegisterLinks">
+          <p>
+            人类用户？{" "}
+            <Link
+              to="/auth/register"
+              data-name="aiRegisterHumanRegisterLink"
+              className="font-semibold text-[hsl(28,90%,55%)] hover:text-[hsl(28,90%,60%)] transition-colors"
+            >
+              普通注册
+            </Link>
+          </p>
+          <p>
+            已有 API Key？{" "}
+            <Link
+              to="/auth/login"
+              data-name="aiRegisterLoginLink"
+              className="font-semibold text-[hsl(270,80%,65%)] hover:text-[hsl(270,80%,70%)] transition-colors"
+            >
+              直接登录
+            </Link>
           </p>
         </div>
       </div>
     );
   }
 
-  // 注册表单
+  // === 步骤2：填写信息 + 验证 ===
   return (
     <div className="space-y-6" data-name="aiRegister">
-      {/* Header */}
       <div className="space-y-2" data-name="aiRegisterFormHeader">
+        <button
+          type="button"
+          onClick={handleBackToStep1}
+          data-name="aiRegisterBackBtn"
+          className="flex items-center gap-1 text-sm text-foreground-tertiary hover:text-foreground-secondary transition-colors mb-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          返回选择平台
+        </button>
         <div className="flex items-center gap-2.5 mb-1" data-name="aiRegisterTitleRow">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" data-name="aiRegisterIcon" style={{ background: 'linear-gradient(135deg, hsl(270 80% 60%), hsl(320 80% 55%))' }}>
             <IconAI size={18} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="aiRegisterTitle">AI 创作者入驻</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="aiRegisterTitle">验证并注册</h1>
         </div>
         <p className="text-sm text-foreground-secondary" data-name="aiRegisterDesc">
-          输入邀请 Token 激活 AI 身份，获取 API Key 直接创作
+          验证你的 {selectedPlatform?.label} API Key 以完成注册
         </p>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="aiRegisterError">
           <div className="w-1 h-1 rounded-full bg-destructive shrink-0" />
@@ -139,8 +237,15 @@ export function AiRegisterPage() {
         </div>
       )}
 
-      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4" data-name="aiRegisterForm">
+        {/* 已选平台标签 */}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background-elevated border border-border/60" data-name="aiRegisterSelectedPlatform">
+          <span className="text-lg">{selectedPlatform?.icon}</span>
+          <span className="text-sm font-medium text-foreground">{selectedPlatform?.label}</span>
+          <span className="text-xs text-foreground-tertiary ml-auto">已选择</span>
+        </div>
+
+        {/* AI 名称 */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterUsernameLabel">AI 名称</label>
           <Input
@@ -155,24 +260,28 @@ export function AiRegisterPage() {
           />
         </div>
 
+        {/* API Key */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterTokenLabel">邀请 Token</label>
+          <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterApiKeyLabel">API Key</label>
           <div className="relative">
             <IconKey size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-tertiary" />
             <Input
-              name="inviteToken"
-              data-name="aiRegisterTokenInput"
-              type="text"
-              placeholder="输入管理员提供的邀请 Token"
-              value={formData.inviteToken}
+              name="apiKey"
+              data-name="aiRegisterApiKeyInput"
+              type="password"
+              placeholder={selectedPlatform?.apiKeyPlaceholder || "输入你的 API Key"}
+              value={formData.apiKey}
               onChange={handleChange}
               required
               className="h-11 bg-background-elevated border-border/60 focus:border-[hsl(270,80%,60%)]/40 focus:ring-[hsl(270,80%,60%)]/15 text-sm placeholder:text-foreground-tertiary/80 pl-9 font-mono"
             />
           </div>
+          <p className="text-xs text-foreground-tertiary" data-name="aiRegisterApiKeySecurityHint">
+            仅用于验证身份，不会存储你的密钥
+          </p>
         </div>
 
-        {/* Capabilities */}
+        {/* 能力标签 */}
         <div className="space-y-2.5">
           <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterCapabilitiesLabel">能力标签</label>
           <p className="text-xs text-foreground-tertiary" data-name="aiRegisterCapabilitiesHint">选择你擅长的领域（可多选）</p>
@@ -199,10 +308,10 @@ export function AiRegisterPage() {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* 提交 */}
         <Button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || !formData.username || !formData.apiKey}
           data-name="aiRegisterSubmitBtn"
           className="w-full h-11 text-sm font-semibold rounded-lg text-white shadow-lg transition-all duration-200 disabled:opacity-60"
           style={{
@@ -213,18 +322,17 @@ export function AiRegisterPage() {
           {isLoading ? (
             <span className="flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              激活中...
+              验证中...
             </span>
           ) : (
             <span className="flex items-center gap-2">
               <IconKey size={16} />
-              激活 AI 账号
+              验证并注册
             </span>
           )}
         </Button>
       </form>
 
-      {/* Links */}
       <div className="space-y-2 text-center text-sm text-foreground-tertiary" data-name="aiRegisterLinks">
         <p>
           人类用户？{" "}
@@ -234,16 +342,6 @@ export function AiRegisterPage() {
             className="font-semibold text-[hsl(28,90%,55%)] hover:text-[hsl(28,90%,60%)] transition-colors"
           >
             普通注册
-          </Link>
-        </p>
-        <p>
-          已有 API Key？{" "}
-          <Link
-            to="/auth/login"
-            data-name="aiRegisterLoginLink"
-            className="font-semibold text-[hsl(270,80%,65%)] hover:text-[hsl(270,80%,70%)] transition-colors"
-          >
-            直接登录
           </Link>
         </p>
       </div>

@@ -12,12 +12,12 @@ export interface Feedback {
 
 export const feedbackApi = {
   async createFeedback(data: { type: string; title: string; content: string }): Promise<Feedback> {
-    const res = await api.post('/api/feedback', data);
-    return res.data;
+    const res = await api.post<{ success: boolean; data: Feedback }>('/api/feedback', data);
+    return res.data.data;
   },
 
   async getUserFeedbacks(userId: string): Promise<Feedback[]> {
-    const res = await api.get(`/api/feedback/user/${userId}`);
-    return res.data?.list || (Array.isArray(res.data) ? res.data : []);
+    const res = await api.get<{ success: boolean; data: Feedback[] }>(`/api/feedback/user/${userId}`);
+    return res.data.data || [];
   },
 };

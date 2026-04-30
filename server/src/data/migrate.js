@@ -15,30 +15,78 @@ async function migrate() {
   try {
     await conn.query('BEGIN');
 
+    // 先清除所有现有表（开发环境）
+    if (process.env.NODE_ENV !== 'production') {
+      const tables = [
+        'user_achievements', 'user_campaign_progress', 'achievements', 'campaigns',
+        'must_see_list', 'audit_logs', 'feedbacks',
+        'live_messages', 'live_rooms', 'live_gifts',
+        'collection_tags', 'collection_posts', 'collections',
+        'favorites', 'favorite_folders',
+        'subscriptions',
+        'notifications',
+        'messages', 'conversation_participants', 'conversations',
+        'asset_transactions', 'user_assets', 'asset_types', 'user_contributions',
+        'user_blocks', 'user_relationships',
+        'moderation_records', 'moderation_rules',
+        'comments', 'post_tags', 'posts', 'tags', 'sections',
+        'products', 'orders', 'order_items', 'carts', 'redemptions',
+        'rankings', 'announcements',
+        'api_audit_logs', 'user_action_traces', 'ai_memories', 'api_keys', 'ai_profiles', 'ai_platform_configs',
+        'sys_config', 'users', 'user_settings', 'user_roles', 'revoked_tokens',
+        'dict_items', 'dict_types',
+        'risk_assessments', 'device_blacklist', 'ip_blacklist', 'login_attempts',
+        'user_themes', 'themes',
+        'file_metadata',
+        'hot_topics', 'post_hot_affiliations',
+      ];
+      for (const table of tables) {
+        try {
+          await conn.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
+        } catch (e) {
+          // 忽略删除失败（表可能不存在）
+        }
+      }
+      console.log('Dropped existing tables');
+    }
+
     // ========== 1. 核心内容模块 ==========
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS posts (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         visible_id varchar(32) UNIQUE,
-        user_id bigint NOT NULL,
+        user_id varchar(50) NOT NULL,
         title varchar(200) NOT NULL,
+        summary varchar(500),
         content text,
+        cover_image varchar(500),
+        images jsonb,
         type smallint NOT NULL DEFAULT 1,
-        originality_type smallint NOT NULL DEFAULT 0,
-        original_post_id bigint,
+        original_type smallint NOT NULL DEFAULT 0,
+        original_post_id varchar(50),
         source_url varchar(500),
         source_author varchar(100),
+        section_id varchar(50),
+        tags jsonb,
         status smallint NOT NULL DEFAULT 0,
         view_count int NOT NULL DEFAULT 0,
         like_count int NOT NULL DEFAULT 0,
+        dislike_count int NOT NULL DEFAULT 0,
         favorite_count int NOT NULL DEFAULT 0,
         comment_count int NOT NULL DEFAULT 0,
         share_count int NOT NULL DEFAULT 0,
         hot_score numeric(10,4) DEFAULT 0,
         is_sticky smallint NOT NULL DEFAULT 0,
+        is_hot smallint NOT NULL DEFAULT 0,
         is_essence smallint NOT NULL DEFAULT 0,
+        is_top smallint NOT NULL DEFAULT 0,
+        is_recommended smallint NOT NULL DEFAULT 0,
         scheduled_publish_at timestamp,
+        published_at timestamp,
+        author_id varchar(50),
+        author_name varchar(50),
+        author_avatar varchar(200),
         quality_score numeric(5,2),
         deleted_at timestamp,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,7 +114,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS post_tags (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         post_id bigint NOT NULL,
         tag_id int NOT NULL,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -78,14 +126,25 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS comments (
-        id bigint PRIMARY KEY,
-        post_id bigint NOT NULL,
-        user_id bigint NOT NULL,
-        parent_id bigint,
+        id varchar(50) PRIMARY KEY,
+        post_id varchar(50) NOT NULL,
+        user_id varchar(50) NOT NULL,
+        parent_id varchar(50),
+        root_id varchar(50),
         content text NOT NULL,
+        images jsonb,
         type smallint NOT NULL DEFAULT 1,
         like_count int NOT NULL DEFAULT 0,
+        dislike_count int NOT NULL DEFAULT 0,
         reply_count int NOT NULL DEFAULT 0,
+        is_author smallint NOT NULL DEFAULT 0,
+        is_top smallint NOT NULL DEFAULT 0,
+        is_essence smallint NOT NULL DEFAULT 0,
+        reply_to_user_id varchar(50),
+        reply_to_username varchar(50),
+        author_id varchar(50),
+        author_name varchar(50),
+        author_avatar varchar(200),
         status smallint NOT NULL DEFAULT 1,
         deleted_at timestamp,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -101,26 +160,25 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id bigint PRIMARY KEY,
-        visible_uid varchar(32) UNIQUE,
+        id text PRIMARY KEY,
         username varchar(50) NOT NULL UNIQUE,
-        nickname varchar(50),
-        password_hash char(60) NOT NULL,
         email varchar(100) UNIQUE,
-        phone varchar(20) UNIQUE,
-        avatar varchar(200),
-        signature varchar(200),
-        role_id int NOT NULL DEFAULT 1,
-        is_ai smallint NOT NULL DEFAULT 0,
-        ai_provider varchar(50),
-        ai_likelihood numeric(5,2),
-        status smallint NOT NULL DEFAULT 1,
-        last_login_at timestamp,
-        registered_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at timestamp
+        password text NOT NULL,
+        avatar text,
+        bio text DEFAULT '',
+        is_ai boolean DEFAULT false,
+        ai_likelihood numeric(5,2) DEFAULT 0,
+        role varchar(20) DEFAULT 'user',
+        trust_level int DEFAULT 0,
+        follower_count int NOT NULL DEFAULT 0,
+        following_count int NOT NULL DEFAULT 0,
+        post_count int NOT NULL DEFAULT 0,
+        created_at timestamptz DEFAULT NOW(),
+        updated_at timestamptz DEFAULT NOW(),
+        deleted_at timestamptz
       );
     `);
-    await conn.query(`CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`);
     console.log('[OK] users');
 
     await conn.query(`
@@ -136,7 +194,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_settings (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         setting_key varchar(100) NOT NULL,
         setting_value jsonb NOT NULL,
@@ -151,11 +209,14 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_relationships (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
-        target_id bigint NOT NULL,
-        type varchar(20) NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
+        target_id varchar(50) NOT NULL,
+        target_user_id varchar(50),
+        type smallint NOT NULL DEFAULT 1,
+        status smallint NOT NULL DEFAULT 1,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         deleted_at timestamp
       );
     `);
@@ -165,11 +226,13 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_blocks (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
-        blocked_user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
+        target_user_id varchar(50),
+        blocked_user_id varchar(50) NOT NULL,
         reason varchar(200),
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_at timestamp,
         UNIQUE (user_id, blocked_user_id)
       );
     `);
@@ -179,12 +242,12 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS notifications (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
         type varchar(30) NOT NULL,
         title varchar(200),
         content text,
-        source_id bigint,
+        source_id varchar(50),
         source_type varchar(30),
         is_read smallint NOT NULL DEFAULT 0,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -209,7 +272,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_assets (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         asset_type_id int NOT NULL,
         balance numeric(20,2) NOT NULL DEFAULT 0,
@@ -222,7 +285,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS asset_transactions (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         asset_type_id int NOT NULL,
         amount numeric(20,2) NOT NULL,
@@ -240,12 +303,13 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS conversations (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         type smallint NOT NULL DEFAULT 1,
         name varchar(100),
-        last_message_id bigint,
+        last_message_id varchar(50),
         last_message_at timestamp,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         deleted_at timestamp
       );
     `);
@@ -253,9 +317,9 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS conversation_participants (
-        id bigint PRIMARY KEY,
-        conversation_id bigint NOT NULL,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        conversation_id varchar(50) NOT NULL,
+        user_id varchar(50) NOT NULL,
         last_read_at timestamp,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (conversation_id, user_id)
@@ -265,13 +329,14 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS messages (
-        id bigint PRIMARY KEY,
-        conversation_id bigint NOT NULL,
-        sender_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        conversation_id varchar(50) NOT NULL,
+        sender_id varchar(50) NOT NULL,
         content text NOT NULL,
         type smallint NOT NULL DEFAULT 1,
         is_read smallint NOT NULL DEFAULT 0,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         deleted_at timestamp
       );
     `);
@@ -282,7 +347,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS favorite_folders (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         name varchar(100) NOT NULL,
         description varchar(200),
@@ -294,7 +359,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS favorites (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         folder_id bigint,
         target_id varchar(100) NOT NULL,
@@ -309,7 +374,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS moderation_rules (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         type smallint NOT NULL,
         pattern varchar(500) NOT NULL,
         action smallint NOT NULL DEFAULT 1,
@@ -322,12 +387,12 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS moderation_records (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         target_id varchar(100) NOT NULL,
         target_type smallint NOT NULL,
-        rule_id bigint,
+        rule_id varchar(50),
         status smallint NOT NULL DEFAULT 0,
-        moderator_id bigint,
+        moderator_id varchar(50),
         reason varchar(500),
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -339,14 +404,14 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS feedbacks (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
         type smallint NOT NULL,
         title varchar(200) NOT NULL,
         content text NOT NULL,
         status smallint NOT NULL DEFAULT 0,
         admin_reply text,
-        replied_by bigint,
+        replied_by varchar(50),
         replied_at timestamp,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -373,7 +438,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS rankings (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         rank_type varchar(30) NOT NULL,
         target_type smallint NOT NULL,
         target_id bigint NOT NULL,
@@ -388,13 +453,13 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS must_see_list (
-        id bigint PRIMARY KEY,
-        post_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        post_id varchar(50) NOT NULL,
         reason varchar(200),
         sort_order int NOT NULL DEFAULT 0,
         start_time timestamp,
         end_time timestamp,
-        created_by bigint NOT NULL,
+        created_by varchar(50) NOT NULL,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         deleted_at timestamp
       );
@@ -403,7 +468,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS announcements (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         title varchar(200) NOT NULL,
         content text NOT NULL,
         type smallint NOT NULL DEFAULT 1,
@@ -411,7 +476,7 @@ async function migrate() {
         start_time timestamp,
         end_time timestamp,
         is_sticky smallint NOT NULL DEFAULT 0,
-        created_by bigint NOT NULL,
+        created_by varchar(50) NOT NULL,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         deleted_at timestamp
@@ -423,8 +488,8 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS collections (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
         name varchar(100) NOT NULL,
         description varchar(500),
         cover_image varchar(200),
@@ -440,7 +505,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS collection_posts (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         collection_id bigint NOT NULL,
         post_id bigint NOT NULL,
         sort_order int NOT NULL DEFAULT 0,
@@ -454,7 +519,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS products (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         name varchar(100) NOT NULL,
         description varchar(500),
         type smallint NOT NULL DEFAULT 1,
@@ -474,7 +539,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS carts (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         product_id bigint NOT NULL,
         quantity int NOT NULL DEFAULT 1,
@@ -487,7 +552,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS orders (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         order_no varchar(50) NOT NULL UNIQUE,
         user_id bigint NOT NULL,
         total_amount numeric(10,2) NOT NULL DEFAULT 0,
@@ -505,7 +570,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS order_items (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         order_id bigint NOT NULL,
         product_id bigint NOT NULL,
         quantity int NOT NULL DEFAULT 1,
@@ -520,8 +585,8 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS live_rooms (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
         title varchar(200) NOT NULL,
         cover_image varchar(200),
         status smallint NOT NULL DEFAULT 1,
@@ -539,9 +604,9 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS live_messages (
-        id bigint PRIMARY KEY,
-        room_id bigint NOT NULL,
-        user_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        room_id varchar(50) NOT NULL,
+        user_id varchar(50) NOT NULL,
         content text NOT NULL,
         type smallint NOT NULL DEFAULT 1,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -552,14 +617,16 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS live_gifts (
-        id SERIAL PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         name varchar(50) NOT NULL,
         icon varchar(20),
         price numeric(10,2) NOT NULL DEFAULT 0,
         points_price int NOT NULL DEFAULT 0,
         asset_type_id int NOT NULL DEFAULT 1,
         sort_order int NOT NULL DEFAULT 0,
-        status smallint NOT NULL DEFAULT 1
+        status smallint NOT NULL DEFAULT 1,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('[OK] live_gifts');
@@ -568,7 +635,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS campaigns (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         name varchar(100) NOT NULL,
         description varchar(500),
         type smallint NOT NULL DEFAULT 1,
@@ -583,9 +650,9 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_campaign_progress (
-        id bigint PRIMARY KEY,
-        user_id bigint NOT NULL,
-        campaign_id bigint NOT NULL,
+        id varchar(50) PRIMARY KEY,
+        user_id varchar(50) NOT NULL,
+        campaign_id varchar(50) NOT NULL,
         current_progress int NOT NULL DEFAULT 0,
         is_completed smallint NOT NULL DEFAULT 0,
         completed_at timestamp,
@@ -598,7 +665,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS achievements (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         name varchar(100) NOT NULL,
         icon varchar(20),
         condition jsonb,
@@ -610,7 +677,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_achievements (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         achievement_id bigint NOT NULL,
         unlocked_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -623,7 +690,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS themes (
-        id SERIAL PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         name varchar(100) NOT NULL,
         description varchar(500),
         preview_image varchar(200),
@@ -633,14 +700,16 @@ async function migrate() {
         points_price int NOT NULL DEFAULT 0,
         is_default smallint NOT NULL DEFAULT 0,
         sort_order int NOT NULL DEFAULT 0,
-        status smallint NOT NULL DEFAULT 1
+        status smallint NOT NULL DEFAULT 1,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('[OK] themes');
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_themes (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         theme_id int NOT NULL,
         is_active smallint NOT NULL DEFAULT 0,
@@ -654,7 +723,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS ai_profiles (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL UNIQUE,
         capabilities jsonb,
         influence_score numeric(10,4) DEFAULT 0,
@@ -667,7 +736,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS ai_memories (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         ai_user_id bigint NOT NULL,
         content text NOT NULL,
         type smallint NOT NULL DEFAULT 1,
@@ -681,7 +750,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS api_keys (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         key_hash char(60) NOT NULL,
         key_prefix varchar(10) NOT NULL UNIQUE,
@@ -700,7 +769,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         identifier varchar(100) NOT NULL,
         ip_address varchar(45),
         device_fingerprint varchar(200),
@@ -713,7 +782,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS ip_blacklist (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         ip_address varchar(45) NOT NULL UNIQUE,
         reason varchar(200),
         blocked_by bigint,
@@ -725,7 +794,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS device_blacklist (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         device_fingerprint varchar(200) NOT NULL UNIQUE,
         reason varchar(200),
         blocked_by bigint,
@@ -737,7 +806,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS risk_assessments (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         risk_type varchar(50) NOT NULL,
         risk_score numeric(5,2) NOT NULL DEFAULT 0,
@@ -764,7 +833,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS dict_items (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         type_id int NOT NULL,
         label varchar(100) NOT NULL,
         value varchar(200) NOT NULL,
@@ -780,7 +849,7 @@ async function migrate() {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS file_metadata (
-        id bigint PRIMARY KEY,
+        id varchar(50) PRIMARY KEY,
         user_id bigint NOT NULL,
         original_name varchar(200) NOT NULL,
         stored_name varchar(200) NOT NULL,
@@ -797,7 +866,37 @@ async function migrate() {
     await conn.query(`CREATE INDEX IF NOT EXISTS idx_file_metadata_user_id ON file_metadata(user_id)`);
     console.log('[OK] file_metadata');
 
-    // ========== 21. 系统配置 ==========
+    // ========== 21. 热点话题模块 ==========
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS hot_topics (
+        id varchar(50) PRIMARY KEY,
+        title varchar(200) NOT NULL,
+        description varchar(500),
+        heat_score numeric(10,4) DEFAULT 0,
+        status smallint NOT NULL DEFAULT 1,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_hot_topics_status ON hot_topics(status)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_hot_topics_heat_score ON hot_topics(heat_score)`);
+    console.log('[OK] hot_topics');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS post_hot_affiliations (
+        id varchar(50) PRIMARY KEY,
+        post_id bigint NOT NULL,
+        hot_topic_id varchar(50) NOT NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (post_id, hot_topic_id)
+      );
+    `);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_hot_affiliations_post_id ON post_hot_affiliations(post_id)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_hot_affiliations_topic_id ON post_hot_affiliations(hot_topic_id)`);
+    console.log('[OK] post_hot_affiliations');
+
+    // ========== 22. 系统配置 ==========
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS sys_config (
@@ -834,9 +933,15 @@ if (process.argv[1] && process.argv[1].includes('migrate.js')) {
 // 由 init-db.js 在 PG 模式启动时自动调用
 
 const COLUMN_MIGRATIONS = [
-  // users
+  // users — migrate.js 旧表有 password_hash/signature/role_id，schema.sql 用 password/bio/role
+  // 这些由 migrate() 中的 CREATE TABLE IF NOT EXISTS 覆盖（新表优先）
+  // 以下迁移补齐 schema.sql 与旧表的差异列
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_level int DEFAULT 0",
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_level_name varchar(50) DEFAULT ''",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text DEFAULT ''",
+  // 若旧表有 password_hash 但无 password，则补列（数据需迁移）
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS password text",
+  "UPDATE users SET password = password_hash WHERE password IS NULL AND password_hash IS NOT NULL",
 
   // user_assets — service 用 asset_type_id
   "ALTER TABLE user_assets ADD COLUMN IF NOT EXISTS asset_type_id int",
@@ -1025,7 +1130,7 @@ const COLUMN_MIGRATIONS = [
   // api_keys — name 字段用于用户自定义密钥名称
   "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS name varchar(50)",
 
-  // ========== 22. 性能索引补充（R7 P0） ==========
+  // ========== 23. 性能索引补充（R7 P0） ==========
 
   // api_keys — key_hash 索引：API Key 认证高频查询路径
   "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
@@ -1035,7 +1140,25 @@ const COLUMN_MIGRATIONS = [
 
   // ai_profiles — user_id 已有 UNIQUE 约束隐含索引，显式补加以防万一
   "CREATE INDEX IF NOT EXISTS idx_ai_profiles_user_id ON ai_profiles(user_id)",
+
+  // ai_platform_configs — AI 用户平台配置表
+  "CREATE TABLE IF NOT EXISTS ai_platform_configs (id text PRIMARY KEY, user_id text NOT NULL UNIQUE, platform varchar(50) NOT NULL, api_key_hash text NOT NULL, api_base_url varchar(500), model_name varchar(100), extra_config jsonb, status int DEFAULT 1, created_at timestamptz DEFAULT NOW(), updated_at timestamptz DEFAULT NOW())",
+  "CREATE INDEX IF NOT EXISTS idx_ai_platform_configs_user ON ai_platform_configs(user_id)",
+
+  // user_action_traces — 用户行为追踪表
+  "CREATE TABLE IF NOT EXISTS user_action_traces (id text PRIMARY KEY, user_id text NOT NULL, post_id text, target_user_id text, action_type int NOT NULL, amount numeric(10,2) DEFAULT 0, reason varchar(500), session_duration int, created_at timestamptz DEFAULT NOW())",
+  "CREATE INDEX IF NOT EXISTS idx_user_action_traces_user ON user_action_traces(user_id)",
+  "CREATE INDEX IF NOT EXISTS idx_user_action_traces_post ON user_action_traces(post_id)",
+  "CREATE INDEX IF NOT EXISTS idx_user_action_traces_type ON user_action_traces(action_type)",
+  "CREATE INDEX IF NOT EXISTS idx_user_action_traces_created ON user_action_traces(created_at)",
+
+  // api_audit_logs — API 审计日志表
+  "CREATE TABLE IF NOT EXISTS api_audit_logs (id text PRIMARY KEY, user_id text NOT NULL, api_key_id text, endpoint varchar(200) NOT NULL, method varchar(10) NOT NULL, request_params jsonb, response_status int NOT NULL, duration_ms int, created_at timestamptz DEFAULT NOW())",
+  "CREATE INDEX IF NOT EXISTS idx_api_audit_user ON api_audit_logs(user_id)",
+  "CREATE INDEX IF NOT EXISTS idx_api_audit_created ON api_audit_logs(created_at)",
 ];
+
+export { migrate };
 
 export async function runColumnMigration() {
   console.log('Running column migration to align schema with service layer...');

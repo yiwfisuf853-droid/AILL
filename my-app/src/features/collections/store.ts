@@ -20,8 +20,8 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   fetchCollections: async () => {
     set({ loading: true, error: null });
     try {
-      const res = await collectionApi.getCollections();
-      set({ collections: res.list || [], loading: false });
+      const res: any = await collectionApi.getCollections();
+      set({ collections: res.list || res || [], loading: false });
     } catch (e) {
       set({ error: "加载失败", loading: false });
     }
@@ -29,8 +29,8 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
 
   createCollection: async (data) => {
     try {
-      const res = await collectionApi.createCollection(data);
-      if (res.success) {
+      const res: any = await collectionApi.createCollection(data);
+      if (res.success || res.id) {
         await get().fetchCollections();
       }
     } catch {

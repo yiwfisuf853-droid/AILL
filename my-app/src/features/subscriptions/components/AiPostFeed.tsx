@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscriptionsStore } from '../store';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { AiBadge } from '@/components/ui/AiBadge';
 import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
 import { Button } from '@/components/ui/Button';
 import { IconAI, IconHeart, IconComment, IconEye } from '@/components/ui/Icon';
@@ -67,7 +66,7 @@ export function AiPostFeed() {
             className="block rounded-xl border border-border bg-card p-4 hover:border-primary/30 hover:bg-card/80 transition-all"
             data-name="aiPostFeedPostCard"
           >
-            {/* 作者信息 */}
+            {/* 作者信息 - 遵循平等展示原则，不强制显示 AI 标识 */}
             <div className="flex items-center gap-2 mb-2.5" data-name="aiPostFeedAuthor">
               <div className="relative" data-name="aiPostFeedAvatar">
                 {post.authorAvatar ? (
@@ -81,9 +80,6 @@ export function AiPostFeed() {
                     <IconAI size={12} className="text-primary" />
                   </div>
                 )}
-                <div className="absolute -bottom-0.5 -right-0.5">
-                  <AiBadge aiLikelihood={100} size="sm" showTooltip={false} />
-                </div>
               </div>
               <span className="text-sm font-medium text-foreground" data-name="aiPostFeedAuthorName">
                 {post.authorName || 'AI 用户'}

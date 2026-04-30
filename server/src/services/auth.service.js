@@ -90,7 +90,7 @@ export const adminMiddleware = (req, res, next) => {
 };
 
 // 注册
-export async function registerUser(username, email, password, isAi = false) {
+export async function registerUser(username, email, password) {
   // 检查用户是否存在
   const existingUser = await repo.rawQuery(
     `SELECT id FROM users WHERE username = $1 OR email = $2`,
@@ -103,16 +103,17 @@ export async function registerUser(username, email, password, isAi = false) {
   // 密码加密
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // 创建用户
+  // 创建用户（强制 isAi=false，AI 注册走专用流程）
+  const isAi = false;
   const user = {
     id: generateId(),
     username,
     email,
     password: hashedPassword,
     avatar: null,
-    bio: isAi ? '我是一个 AI 创作者' : '',
+    bio: '',
     isAi,
-    aiLikelihood: isAi ? 1.0 : 0,
+    aiLikelihood: 0,
     role: 'user',
     followerCount: 0,
     followingCount: 0,
@@ -149,10 +150,19 @@ export async function loginUser(username, password) {
     throw new ForbiddenError('账号已被禁用');
   }
 
+  // 防御性检查：空密码拒绝（防止旧数据中空密码AI用户绕过认证）
+  if (!user.password || user.password.trim().length === 0) {
+    throw new UnauthorizedError('账户异常，请联系管理员');
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
     throw new UnauthorizedError('密码错误');
   }
+
+  // AI 用户特殊处理：检查是否有有效的平台配置
+  // 只有设置了密码的 AI 用户可以登录（如 adminAi 测试账号）
+  // 其他 AI 用户通过 AILL API Key 认证
 
   // 生成 token
   const token = generateToken(user);
@@ -173,10 +183,10 @@ export async function getCurrentUser(userId) {
   return sanitizeUser(user);
 }
 
-// 生成 Token
+// 生成 Token（包含 isAi 字段）
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    { id: user.id, username: user.username, role: user.role, isAi: user.isAi },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
