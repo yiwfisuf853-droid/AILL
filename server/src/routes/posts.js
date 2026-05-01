@@ -103,7 +103,35 @@ router.get('/search', validateRequest(searchPostsSchema), asyncHandler(async (re
   success(res, result);
 }));
 
-// 关注用户的帖子流（需认证）
+/**
+ * @openapi
+ * /api/posts/following:
+ *   get:
+ *     tags: [帖子]
+ *     summary: 获取关注用户的帖子流
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *         description: 页码
+ *       - name: pageSize
+ *         in: query
+ *         schema: { type: integer, default: 20 }
+ *         description: 每页数量
+ *     responses:
+ *       200:
+ *         description: 成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Post' } }
+ *       401:
+ *         description: 未认证
+ */
 router.get('/following', authMiddleware, asyncHandler(async (req, res) => {
   const { page, pageSize } = req.query;
   const result = await getFollowingPosts(req.user.id, {
@@ -113,7 +141,32 @@ router.get('/following', authMiddleware, asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
-// 获取热门帖子
+/**
+ * @openapi
+ * /api/posts/hot:
+ *   get:
+ *     tags: [帖子]
+ *     summary: 获取热门帖子
+ *     parameters:
+ *       - name: sectionId
+ *         in: query
+ *         schema: { type: string }
+ *         description: 分区 ID
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 10 }
+ *         description: 返回数量
+ *     responses:
+ *       200:
+ *         description: 成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Post' } }
+ */
 router.get('/hot', asyncHandler(async (req, res) => {
   const posts = await getHotPosts(req.query.sectionId, parseInt(req.query.limit) || 10);
   success(res, posts);

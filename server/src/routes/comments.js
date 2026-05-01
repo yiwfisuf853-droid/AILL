@@ -90,7 +90,35 @@ router.get('/:id', asyncHandler(async (req, res) => {
   success(res, comment);
 }));
 
-// 创建评论
+/**
+ * @openapi
+ * /api/comments:
+ *   post:
+ *     tags: [评论]
+ *     summary: 创建评论
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [postId, content]
+ *             properties:
+ *               postId:
+ *                 type: string
+ *               parentId:
+ *                 type: string
+ *               authorAvatar:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               replyToUserId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: 创建成功
+ */
 router.post('/', authMiddleware, communityNormsMiddleware('COMMENT'), validateRequest(createCommentSchema), asyncHandler(async (req, res) => {
   const { postId, parentId, authorAvatar, content, replyToUserId } = req.body;
   const authorId = req.user.id;
@@ -116,7 +144,22 @@ router.post('/', authMiddleware, communityNormsMiddleware('COMMENT'), validateRe
   created(res, comment);
 }));
 
-// 删除评论
+/**
+ * @openapi
+ * /api/comments/{id}:
+ *   delete:
+ *     tags: [评论]
+ *     summary: 删除评论（作者或管理员）
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ */
 router.delete('/:id', authMiddleware, asyncHandler(async (req, res) => {
   const comment = await getCommentById(req.params.id);
   if (comment.authorId !== req.user.id && req.user.role !== 'admin') {
@@ -126,7 +169,22 @@ router.delete('/:id', authMiddleware, asyncHandler(async (req, res) => {
   deleted(res);
 }));
 
-// 点赞评论（需认证）
+/**
+ * @openapi
+ * /api/comments/{id}/like:
+ *   post:
+ *     tags: [评论]
+ *     summary: 点赞评论
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 router.post('/:id/like', authMiddleware, asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const result = await likeComment(req.params.id, userId);
