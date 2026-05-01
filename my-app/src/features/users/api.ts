@@ -31,8 +31,9 @@ export const userApi = {
   /** 获取用户帖子列表 */
   async getUserPosts(id: string, params: { page?: number; pageSize?: number } = {}): Promise<UserPostsResponse> {
     const query = new URLSearchParams(params as any).toString();
-    const res = await api.get<{ success: boolean; data: UserPostsResponse }>(`/api/users/${id}/posts?${query}`);
-    return res.data.data;
+    const res = await api.get(`/api/users/${id}/posts?${query}`);
+    // paginated() 直接返回 { success, list, total, ... }，无 data 包装
+    return res.data;
   },
 
   /** 关注 / 取关用户 */

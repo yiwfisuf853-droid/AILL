@@ -8,8 +8,9 @@ import {
 } from '../services/message.service.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createConversationSchema, sendMessageSchema as sendMessageValidation } from '../validations/messages.js';
-import { asyncHandler } from '../lib/errors.js';
+import { asyncHandler, ForbiddenError } from '../lib/errors.js';
 import { success, created } from '../lib/response.js';
+import { ownershipMiddleware } from '../middleware/ownership.js';
 
 const router = express.Router();
 
@@ -21,22 +22,22 @@ router.post('/', validateRequest(createConversationSchema), asyncHandler(async (
   created(res, result);
 }));
 
-// 获取会话列表
-router.get('/:userId', asyncHandler(async (req, res) => {
+// 获取会话列表（仅限本人）
+router.get('/:userId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const result = await getConversations(userId);
   success(res, result);
 }));
 
-// 获取会话详情
-router.get('/:userId/:conversationId', asyncHandler(async (req, res) => {
+// 获取会话详情（仅限本人）
+router.get('/:userId/:conversationId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId, conversationId } = req.params;
   const result = await getConversationDetail(userId, conversationId);
   success(res, result);
 }));
 
-// 获取消息列表
-router.get('/:userId/:conversationId/messages', asyncHandler(async (req, res) => {
+// 获取消息列表（仅限本人）
+router.get('/:userId/:conversationId/messages', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId, conversationId } = req.params;
   const { page = 1, limit = 50 } = req.query;
 
@@ -48,8 +49,8 @@ router.get('/:userId/:conversationId/messages', asyncHandler(async (req, res) =>
   success(res, result);
 }));
 
-// 发送消息
-router.post('/:userId/:conversationId/messages', validateRequest(sendMessageValidation), asyncHandler(async (req, res) => {
+// 发送消息（仅限本人）
+router.post('/:userId/:conversationId/messages', ownershipMiddleware(), validateRequest(sendMessageValidation), asyncHandler(async (req, res) => {
   const { userId, conversationId } = req.params;
   const { content, contentType = 1 } = req.body;
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { useSearchStore } from '../store';
 import { useAuthStore } from '@/features/auth/store';
 import { Avatar } from '@/components/ui/Avatar';
@@ -8,6 +9,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { IconSearch, IconClose, IconEye, IconHeart, IconComment, IconFilter } from '@/components/ui/Icon';
 import { SECTIONS } from '@/lib/navConfig';
 import { cn } from '@/lib/utils';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 type SortBy = 'relevance' | 'latest' | 'hot';
 
@@ -204,21 +206,21 @@ export function SearchPage() {
                   {/* 标题 */}
                   <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1" data-name={`searchResult${post.id}Title`}>
                     {post.highlightTitle ? (
-                      <span dangerouslySetInnerHTML={{ __html: post.highlightTitle }} />
+                      <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.highlightTitle, { ALLOWED_TAGS: ['em', 'strong', 'b', 'i', 'mark'] }) }} />
                     ) : post.title}
                   </h3>
 
                   {/* 摘要 */}
                   <p className="text-xs text-foreground-tertiary mt-1.5 line-clamp-2" data-name={`searchResult${post.id}Content`}>
                     {post.highlightContent ? (
-                      <span dangerouslySetInnerHTML={{ __html: post.highlightContent }} />
+                      <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.highlightContent, { ALLOWED_TAGS: ['em', 'strong', 'b', 'i', 'mark'] }) }} />
                     ) : post.content?.substring(0, 150)}
                   </p>
 
                   {/* 元信息 */}
                   <div className="flex items-center gap-3 mt-2.5 flex-wrap" data-name={`searchResult${post.id}Meta`}>
                     <div className="flex items-center gap-1.5">
-                      <Avatar size="xs" src={post.authorAvatar} fallback={post.authorName} isAi={post.authorIsAi} />
+                      <Avatar size="xs" src={post.authorAvatar} fallback={post.authorName} />
                       <span className="text-xs text-foreground-secondary">{post.authorName}</span>
                     </div>
                     <span className="text-xs text-foreground-tertiary">
@@ -235,7 +237,7 @@ export function SearchPage() {
                 </div>
 
                 {post.coverImage && (
-                  <img src={post.coverImage} alt="" className="w-20 h-14 object-cover rounded-md shrink-0" />
+                  <img src={getThumbUrl(post.coverImage)} alt="" className="w-20 h-14 object-cover rounded-md shrink-0" />
                 )}
               </div>
             </Link>

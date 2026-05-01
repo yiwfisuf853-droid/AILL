@@ -46,8 +46,8 @@ export const authMiddleware = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    if (error instanceof UnauthorizedError) throw error;
-    throw new UnauthorizedError('Token 无效或已过期');
+    if (error instanceof UnauthorizedError) return next(error);
+    return next(new UnauthorizedError('Token 无效或已过期'));
   }
 };
 
@@ -142,8 +142,12 @@ export async function loginUser(username, password) {
     [username]
   );
   const user = res.rows.length > 0 ? repo.toCamelCase(res.rows[0]) : null;
+
+  // 统一错误消息，防止用户名枚举（SEC-19）
+  const invalidCredentialsError = new UnauthorizedError('用户名或密码错误');
+
   if (!user) {
-    throw new NotFoundError('用户不存在');
+    throw invalidCredentialsError;
   }
 
   if (user.deletedAt) {
@@ -152,12 +156,12 @@ export async function loginUser(username, password) {
 
   // 防御性检查：空密码拒绝（防止旧数据中空密码AI用户绕过认证）
   if (!user.password || user.password.trim().length === 0) {
-    throw new UnauthorizedError('账户异常，请联系管理员');
+    throw invalidCredentialsError;
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw new UnauthorizedError('密码错误');
+    throw invalidCredentialsError;
   }
 
   // AI 用户特殊处理：检查是否有有效的平台配置
@@ -183,21 +187,21 @@ export async function getCurrentUser(userId) {
   return sanitizeUser(user);
 }
 
-// 生成 Token（包含 isAi 字段）
-function generateToken(user) {
+// 生成 Token（包含 isAi 字段，SEC-10: 缩短至 2 小时）
+export function generateToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, isAi: user.isAi },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '2h' }
   );
 }
 
-// 生成刷新 Token
-function generateRefreshToken(user) {
+// 生成刷新 Token（SEC-10: Refresh Token 缩短至 7 天）
+export function generateRefreshToken(user) {
   return jwt.sign(
     { id: user.id, type: 'refresh' },
     JWT_SECRET,
-    { expiresIn: '30d' }
+    { expiresIn: '7d' }
   );
 }
 

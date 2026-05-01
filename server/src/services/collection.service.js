@@ -86,7 +86,8 @@ export async function getCollectionDetail(id) {
  * 创建合集
  */
 export async function createCollection(data) {
-  if (!data.title) throw new ValidationError('缺少合集标题');
+  const title = data.title || data.name;
+  if (!title) throw new ValidationError('缺少合集标题');
   if (!data.userId) throw new ValidationError('缺少用户ID');
 
   const user = await repo.findById('users', data.userId);
@@ -94,16 +95,13 @@ export async function createCollection(data) {
 
   const item = await repo.insert('collections', {
     id: generateId(),
-    title: data.title,
+    name: title,
     description: data.description || '',
     coverImage: data.coverImage || '',
-    authorId: data.userId,
-    authorName: user.username,
+    userId: data.userId,
+    type: data.type || 1,
+    visibility: data.visibility || 1,
     postCount: 0,
-    tags: data.tags || [],
-    viewCount: 0,
-    likeCount: 0,
-    status: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });

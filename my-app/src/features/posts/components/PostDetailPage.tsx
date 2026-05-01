@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  IconHeart, IconComment, IconShare, IconEye, IconBookmark, IconChevronRight, IconChevronLeft, IconEdit, IconDelete
+  IconHeart, IconComment, IconShare, IconEye, IconBookmark, IconChevronRight, IconChevronLeft, IconEdit, IconDelete, IconStar, IconFlag
 } from '@/components/ui/Icon';
 import { SEO } from '@/components/common/SEO';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,7 @@ import { MarkdownPreview } from '@/components/ui/MarkdownEditor';
 import { Avatar } from '@/components/ui/Avatar';
 import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
 import { AiReplyButton } from '@/components/ui/AiReplyButton';
+import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { EditHistoryDialog } from '@/features/posts/components/EditHistoryDialog';
 import { usePostDetail } from '@/features/posts/hooks/usePosts';
 import type { Post } from '@/features/posts/types';
@@ -19,7 +20,10 @@ import { CommentList } from '@/features/comments/components/CommentList';
 import { useSocket } from '@/hooks/useSocket';
 import type { Comment } from '@/features/comments/types';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { RewardModal } from '@/features/rewards/components/RewardModal';
+import { ReportModal } from '@/features/reports/components/ReportModal';
 import { SECTION_MAP } from '@/lib/navConfig';
+import { getImageUrl } from '@/lib/imageUtils';
 
 export function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,6 +53,27 @@ export function PostDetailPage() {
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [rewardModalOpen, setRewardModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // 浏览时长追踪
+  const enterTimeRef = useRef<number>(0);
+  useEffect(() => {
+    if (post?.id) {
+      enterTimeRef.current = Date.now();
+    }
+    return () => {
+      if (post?.id && enterTimeRef.current) {
+        const duration = Math.round((Date.now() - enterTimeRef.current) / 1000);
+        if (duration > 0) {
+          const { viewPost } = usePostsStore.getState();
+          viewPost(post.id, duration).catch(() => {});
+        }
+      }
+    };
+  }, [post?.id]);
 
   const handleLike = async () => { if (id) { setLikeAnimating(true); await likePost(id); } };
   const handleLikeAnimEnd = useCallback(() => setLikeAnimating(false), []);
@@ -83,8 +108,6 @@ export function PostDetailPage() {
 
   const section = SECTION_MAP[post.sectionId];
   const sectionColor = section?.hsl || '210 100% 56%';
-  const isAi = post.authorIsAi || false;
-  const aiLikelihood = post.authorAiLikelihood || 100;
 
   return (
     <div className="py-3" data-name="postDetail">
@@ -124,8 +147,6 @@ export function PostDetailPage() {
                     size="sm"
                     src={post.authorAvatar}
                     fallback={post.authorName}
-                    isAi={isAi}
-                    aiLikelihood={aiLikelihood}
                   />
                 </Link>
                 <div>
@@ -161,8 +182,21 @@ export function PostDetailPage() {
 
           {/* Cover */}
           {post.coverImage && (
-            <div className="rounded-lg overflow-hidden mb-4" data-name="postDetailCoverImage">
-              <img src={post.coverImage} alt="" className="w-full object-cover max-h-[280px]" />
+            <div
+              className="rounded-lg overflow-hidden mb-4 cursor-zoom-in"
+              data-name="postDetailCoverImage"
+              onClick={() => {
+                const allImages = [post.coverImage!, ...(post.images || [])];
+                setLightboxIndex(0);
+                setLightboxOpen(true);
+              }}
+            >
+              <img
+                src={getImageUrl(post.coverImage, 'medium') || post.coverImage}
+                alt=""
+                className="w-full object-cover max-h-[280px]"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
           )}
 
@@ -175,7 +209,21 @@ export function PostDetailPage() {
           {post.images && post.images.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4" data-name="postDetailImages">
               {post.images.map((img: string, idx: number) => (
-                <img key={idx} src={img} alt="" className="w-full h-32 object-cover rounded-lg" loading="lazy" />
+                <img
+                  key={idx}
+                  src={getImageUrl(img, 'medium') || img}
+                  alt=""
+                  className="w-full h-32 object-cover rounded-lg cursor-zoom-in hover:opacity-80 transition-opacity"
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onClick={() => {
+                    const allImages = post.coverImage
+                      ? [post.coverImage, ...post.images!]
+                      : post.images!;
+                    setLightboxIndex(post.coverImage ? idx + 1 : idx);
+                    setLightboxOpen(true);
+                  }}
+                />
               ))}
             </div>
           )}
@@ -203,6 +251,16 @@ export function PostDetailPage() {
               <AiReplyButton postId={post.id} className="ml-1" />
             </div>
             <div data-name="postDetailActionsRight" className="flex items-center gap-0.5">
+              {!isOwner && (
+                <>
+                  <button onClick={() => setRewardModalOpen(true)} data-name="postDetailRewardBtn" className="actionBtn !gap-1 hover:text-[hsl(45,90%,55%)]">
+                    <IconStar size={14} /> <span className="text-xs">打赏</span>
+                  </button>
+                  <button onClick={() => setReportModalOpen(true)} data-name="postDetailReportBtn" className="actionBtn !gap-1 hover:text-destructive">
+                    <IconFlag size={14} /> <span className="text-xs">举报</span>
+                  </button>
+                </>
+              )}
               {isOwner && (
                 <>
                   <Link to={`/posts/${id}/edit`} className="actionBtn !gap-1 hover:text-primary" data-name="postDetailEditBtn">
@@ -246,6 +304,30 @@ export function PostDetailPage() {
         open={historyDialogOpen}
         onClose={() => setHistoryDialogOpen(false)}
         postId={id || ''}
+      />
+
+      {/* Reward */}
+      <RewardModal
+        open={rewardModalOpen}
+        onClose={() => setRewardModalOpen(false)}
+        postId={id || ''}
+        postTitle={post.title}
+      />
+
+      {/* Report */}
+      <ReportModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        postId={id || ''}
+        postTitle={post.title}
+      />
+
+      {/* Lightbox */}
+      <ImageLightbox
+        images={post.coverImage ? [post.coverImage, ...(post.images || [])] : (post.images || [])}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
       />
     </div>
   );

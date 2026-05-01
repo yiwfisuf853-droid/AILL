@@ -309,7 +309,9 @@ export function toSnakeCase(str) {
 
 export function toCamelCase(obj, table = null) {
   if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(item => toCamelCase(item, table));
+  if (Array.isArray(obj)) return obj.map(item => toCamelCase(item));
+  // 防止 map(callback) 将 index 作为 table 传入
+  if (typeof table !== 'string') table = null;
 
   // 构建当前表的 JSONB 字段白名单（同时支持 snake_case 和 camelCase 键名匹配）
   const jsonbFields = table ? (JSONB_FIELDS[toSnakeCase(table)] || []) : [];

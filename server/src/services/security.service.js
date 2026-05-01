@@ -86,7 +86,7 @@ async function checkAndAutoBlock(data) {
 export async function getIpBlacklist(options = {}) {
   const { page = 1, limit = 20 } = options;
 
-  return await repo.findAll('ip_blacklist', { page, limit, orderBy: 'blocked_at DESC' });
+  return await repo.findAll('ip_blacklist', { page, limit, orderBy: 'created_at DESC' });
 }
 
 /**
@@ -95,12 +95,12 @@ export async function getIpBlacklist(options = {}) {
 export async function addIpToBlacklist(data) {
   if (!data.ip) throw new ValidationError('缺少IP地址');
 
-  const existing = await repo.findOne('ip_blacklist', { ip: data.ip });
+  const existing = await repo.findOne('ip_blacklist', { ipAddress: data.ip });
   if (existing) throw new ConflictError('IP已在黑名单中');
 
   const item = {
     id: generateId(),
-    ip: data.ip,
+    ipAddress: data.ip,
     reason: data.reason || '管理员手动封禁',
     blockedAt: new Date().toISOString(),
     expiresAt: data.expiresAt || null,
@@ -245,6 +245,7 @@ export async function createFileMetadata(data) {
     width: data.width || null,
     height: data.height || null,
     duration: data.duration || null,
+    variants: data.variants || null,
     uploadedBy: data.uploadedBy,
     uploadedAt: new Date().toISOString(),
   };

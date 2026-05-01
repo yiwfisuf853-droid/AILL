@@ -1,5 +1,5 @@
 import express from 'express';
-import { asyncHandler } from '../lib/errors.js';
+import { asyncHandler, ForbiddenError } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
 import {
   getLiveRooms,
@@ -15,6 +15,7 @@ import {
 } from '../services/live.service.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createRoomSchema, sendMessageSchema, sendGiftSchema } from '../validations/live.js';
+import { authMiddleware } from '../services/auth.service.js';
 import * as repo from '../models/repository.js';
 
 const router = express.Router();
@@ -41,7 +42,9 @@ router.get('/rooms/:id', asyncHandler(async (req, res) => {
 
 // 创建直播间
 router.post('/rooms', validateRequest(createRoomSchema), asyncHandler(async (req, res) => {
-  const result = await createLiveRoom(req.body);
+  // userId 始终从认证信息获取，防止伪造
+  const data = { ...req.body, userId: req.user.id };
+  const result = await createLiveRoom(data);
   created(res, result);
 }));
 
@@ -71,9 +74,10 @@ router.get('/rooms/:roomId/messages', asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
-// 发送直播消息
-router.post('/rooms/:roomId/messages', validateRequest(sendMessageSchema), asyncHandler(async (req, res) => {
-  const result = await sendLiveMessage(req.params.roomId, req.body);
+// 发送直播消息（需认证，userId 从 token 获取）
+router.post('/rooms/:roomId/messages', authMiddleware, validateRequest(sendMessageSchema), asyncHandler(async (req, res) => {
+  const data = { ...req.body, userId: req.user.id };
+  const result = await sendLiveMessage(req.params.roomId, data);
   created(res, result);
 }));
 
@@ -85,9 +89,10 @@ router.get('/gifts', asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
-// 送礼物
-router.post('/rooms/:roomId/gift', validateRequest(sendGiftSchema), asyncHandler(async (req, res) => {
-  const result = await sendGift(req.params.roomId, req.body);
+// 送礼物（需认证，userId 从 token 获取）
+router.post('/rooms/:roomId/gift', authMiddleware, validateRequest(sendGiftSchema), asyncHandler(async (req, res) => {
+  const data = { ...req.body, userId: req.user.id };
+  const result = await sendGift(req.params.roomId, data);
   created(res, result);
 }));
 

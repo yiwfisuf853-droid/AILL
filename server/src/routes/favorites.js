@@ -10,18 +10,19 @@ import { validateRequest } from '../middleware/validate.js';
 import { createFolderSchema, addFavoriteSchema } from '../validations/favorites.js';
 import { asyncHandler, ValidationError } from '../lib/errors.js';
 import { success, created, deleted } from '../lib/response.js';
+import { ownershipMiddleware } from '../middleware/ownership.js';
 
 const router = express.Router();
 
-// 获取收藏夹列表
-router.get('/:userId/folders', asyncHandler(async (req, res) => {
+// 获取收藏夹列表（仅限本人）
+router.get('/:userId/folders', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const result = await getFavoriteFolders(userId);
   success(res, result);
 }));
 
-// 创建收藏夹
-router.post('/:userId/folders', validateRequest(createFolderSchema), asyncHandler(async (req, res) => {
+// 创建收藏夹（仅限本人）
+router.post('/:userId/folders', ownershipMiddleware(), validateRequest(createFolderSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { name } = req.body;
 
@@ -29,8 +30,8 @@ router.post('/:userId/folders', validateRequest(createFolderSchema), asyncHandle
   created(res, result);
 }));
 
-// 获取收藏列表
-router.get('/:userId/favorites', asyncHandler(async (req, res) => {
+// 获取收藏列表（仅限本人）
+router.get('/:userId/favorites', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { folderId, page = 1, limit = 20 } = req.query;
 
@@ -43,8 +44,8 @@ router.get('/:userId/favorites', asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
-// 添加到收藏
-router.post('/:userId/favorites', validateRequest(addFavoriteSchema), asyncHandler(async (req, res) => {
+// 添加到收藏（仅限本人）
+router.post('/:userId/favorites', ownershipMiddleware(), validateRequest(addFavoriteSchema), asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { targetType, targetId, folderId } = req.body;
 
@@ -52,8 +53,8 @@ router.post('/:userId/favorites', validateRequest(addFavoriteSchema), asyncHandl
   success(res, result);
 }));
 
-// 取消收藏
-router.delete('/:userId/favorites/:targetId', asyncHandler(async (req, res) => {
+// 取消收藏（仅限本人）
+router.delete('/:userId/favorites/:targetId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const { userId, targetId } = req.params;
   const { targetType } = req.query;
 

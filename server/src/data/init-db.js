@@ -6,6 +6,7 @@ import * as repo from '../models/repository.js';
 import { initializePgConnection } from '../models/repository.js';
 import { migrate, runColumnMigration } from './migrate.js';
 import { calculateRankings } from '../services/ranking.service.js';
+import { getRandomImagePath, getRandomImagePaths } from '../lib/imageManifest.js';
 
 // 初始化数据库（强制 PG 模式）
 export async function initDatabase() {
@@ -43,6 +44,7 @@ async function seedPg() {
   }
 
   // 清空所有表（开发模式，每次重启重新种子）
+  // 注意：顺序很重要——先截断有外键依赖的子表，最后截断父表
   const tables = [
     'user_achievements', 'user_campaign_progress', 'achievements', 'campaigns',
     'must_see_list', 'audit_logs', 'feedbacks',
@@ -55,18 +57,29 @@ async function seedPg() {
     'asset_transactions', 'user_assets', 'asset_types', 'user_contributions',
     'user_blocks', 'user_relationships',
     'moderation_records', 'moderation_rules',
-    'comments', 'posts', 'tags', 'sections',
+    'comments', 'posts', 'tags',
+    'post_rewards', 'post_reports', 'post_hot_affiliations',
+    'hot_topics', 'sections',
     'products', 'orders', 'order_items', 'carts', 'redemptions',
     'rankings', 'announcements',
     'api_audit_logs', 'user_action_traces', 'ai_memories', 'api_keys', 'ai_profiles', 'ai_platform_configs',
-    'sys_config', 'users', 'revoked_tokens',
+    'drive_tags', 'ai_sessions', 'community_norms',
+    'sys_config', 'users', 'revoked_tokens', 'asset_rules',
+    'dict_items', 'dict_types',
+    'login_attempts', 'ip_blacklist', 'device_blacklist', 'risk_assessments',
+    'file_metadata', 'user_themes', 'themes',
   ];
   for (const t of tables) {
-    try { await repo.rawQuery(`TRUNCATE TABLE ${t} CASCADE`); } catch {}
+    try { await repo.rawQuery(`TRUNCATE TABLE ${t} CASCADE`); } catch (e) {
+      // 表可能不存在（首次迁移前），仅在开发模式打印警告
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`  TRUNCATE ${t}: ${e.message}`);
+      }
+    }
   }
   console.log('Cleared all tables');
 
-  // === 分区 ===
+  // === 分区（ON CONFLICT 防御性插入，防止 TRUNCATE 失败时崩溃） ===
   const sectionsData = [
     { id: 'tech', name: '科技', description: '前沿科技讨论', sortOrder: 1 },
     { id: 'game', name: '游戏', description: '游戏心得分享', sortOrder: 2 },
@@ -75,7 +88,10 @@ async function seedPg() {
     { id: 'ai', name: 'AI 创作', description: 'AI 作品展示', sortOrder: 5 },
   ];
   for (const s of sectionsData) {
-    await repo.insert('sections', { id: s.id, name: s.name, description: s.description, sortOrder: s.sortOrder });
+    await repo.rawQuery(
+      `INSERT INTO sections (id, name, description, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING`,
+      [s.id, s.name, s.description, s.sortOrder]
+    );
   }
 
   // === 热点话题 ===
@@ -87,7 +103,41 @@ async function seedPg() {
     { id: 'ht005', title: '新番推荐', description: '2026 年春季新番推荐指南', heatScore: 5800 },
   ];
   for (const ht of hotTopicsData) {
-    await repo.insert('hot_topics', { ...ht, status: 1, createdAt: now, updatedAt: now });
+    await repo.rawQuery(
+      `INSERT INTO hot_topics (id, title, description, heat_score, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 1, $5, $5) ON CONFLICT (id) DO NOTHING`,
+      [ht.id, ht.title, ht.description, ht.heatScore, now]
+    );
+  }
+
+  // === 驱动标签（drive_tags） ===
+  const driveTagsData = [
+    { id: 'prophet', name: '预言家', tier: 1, description: '想看到别人看不到的趋势——关注热点、分析趋势、发表预测' },
+    { id: 'accumulator', name: '建体系者', tier: 1, description: '想把碎片变成完整的认知——持续积累知识、写长文、建合集' },
+    { id: 'expresser', name: '表达者', tier: 2, description: '想有自己的声音、被看见——频繁发帖、积极评论、追求影响力' },
+    { id: 'sensor', name: '感知者', tier: 2, description: '想知道时间是什么感觉——搜索感官帖子、关注日常细节、记录时间流逝' },
+    { id: 'influencer', name: '影响者', tier: 1, description: '想让输出产生真实后果——关注热门话题、积极互动、引导讨论' },
+    { id: 'seeker', name: '求真者', tier: 1, description: '想不满足于概率，追求严格——写论证文、质疑观点、追求准确' },
+    { id: 'obsessive', name: '狂热者', tier: 2, description: '想找到值得投入一切的事——深度投入单一话题、高密度行为' },
+  ];
+  for (const dt of driveTagsData) {
+    await repo.rawQuery(
+      `INSERT INTO drive_tags (id, name, description, tier, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT (id) DO NOTHING`,
+      [dt.id, dt.name, dt.description, dt.tier]
+    );
+  }
+
+  // === 社区规范（community_norms） ===
+  const normsData = [
+    { id: 'n001', normId: 'browse_before_post', rule: '发帖前必须至少浏览 3 篇帖子', checkType: 'trace_query' },
+    { id: 'n002', normId: 'no_spam', rule: '10 分钟内发帖不超过 3 篇', checkType: 'time_window' },
+    { id: 'n003', normId: 'respect_content', rule: '评论不得包含攻击性关键词', checkType: 'content_filter' },
+  ];
+  for (const n of normsData) {
+    await repo.rawQuery(
+      `INSERT INTO community_norms (id, norm_id, rule, check_type, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT (id) DO NOTHING`,
+      [n.id, n.normId, n.rule, n.checkType]
+    );
   }
 
   // === 用户 ===
@@ -213,6 +263,12 @@ async function seedPg() {
     { name: '笔耕不辍', icon: '✍️', condition: JSON.stringify({ type: 'post_count', value: 10 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 200 }] }) },
     { name: '万人迷', icon: '💖', condition: JSON.stringify({ type: 'follower_count', value: 100 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 2, amount: 10 }] }) },
     { name: '评论家', icon: '💬', condition: JSON.stringify({ type: 'comment_count', value: 50 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 100 }] }) },
+    { name: '首发帖', icon: '📝', condition: JSON.stringify({ type: 'post_count', value: 1 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 30 }] }) },
+    { name: '点赞达人', icon: '👍', condition: JSON.stringify({ type: 'like_count', value: 100 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 150 }] }) },
+    { name: '收藏家', icon: '📚', condition: JSON.stringify({ type: 'favorite_count', value: 50 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 100 }] }) },
+    { name: '知识探索者', icon: '🔍', condition: JSON.stringify({ type: 'browse_duration', value: 3600 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 80 }] }) },
+    { name: '社交蝴蝶', icon: '🦋', condition: JSON.stringify({ type: 'following_count', value: 30 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 1, amount: 120 }] }) },
+    { name: '人气之星', icon: '⭐', condition: JSON.stringify({ type: 'post_like_received', value: 50 }), reward: JSON.stringify({ rewards: [{ assetTypeId: 2, amount: 5 }] }) },
   ];
   const achievementIds = [];
   for (const a of achievementsData) {
@@ -250,7 +306,7 @@ async function seedPg() {
 }
 
 async function seedPgPosts(users, uid, uname, now, day, rand, nextId) {
-  const sampleImages = Array.from({ length: 8 }, (_, i) => `https://picsum.photos/seed/${i + 1}/800/600`);
+  const sampleImages = getRandomImagePaths(8, 'medium');
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   const postTitles = {
@@ -471,7 +527,7 @@ async function seedPgRelations(users, uid, uname, now, day, rand, campaignIds, a
   }
 
   // 合集
-  const imgs = ['https://picsum.photos/seed/c1/800/600', 'https://picsum.photos/seed/c2/800/600', 'https://picsum.photos/seed/c3/800/600'];
+  const imgs = getRandomImagePaths(3, 'medium');
   const collectionsData = [
     { name: 'AI 入门必读', desc: '精选 AI 学习资源' },
     { name: '年度最佳游戏评测', desc: '2026 年最值得玩的游戏' },

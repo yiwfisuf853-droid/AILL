@@ -9,7 +9,7 @@ export async function createAuditLog({ operatorId, operatorName, action, targetT
     action,
     targetType: targetType ? Number(targetType) : null,
     targetId: targetId || '',
-    description: detail || '',
+    detail: detail || '',
     ip: ip || '',
     createdAt: new Date().toISOString(),
   };
@@ -22,7 +22,7 @@ export async function getAuditLogs({ page = 1, limit = 20, operatorId, action, t
   const where = {};
   if (operatorId) where.operatorId = operatorId;
   if (action) where.action = action;
-  if (targetType) where.targetType = targetType;
+  if (targetType !== undefined) where.targetType = Number(targetType);
   const result = await repo.findAll('audit_logs', { where, page, limit, orderBy: 'created_at DESC' });
   return { ...result, hasMore: (result.page * result.limit) < result.total };
 }

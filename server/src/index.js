@@ -1,10 +1,12 @@
 import path from 'path';
+import { fileURLToPath } from 'url';
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
 import postRoutes from './routes/posts.js';
 import commentRoutes from './routes/comments.js';
@@ -30,48 +32,56 @@ import uploadRoutes from './routes/upload.js';
 import auditRoutes from './routes/audit.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import hotTopicRoutes from './routes/hot-topics.js';
+import sectionRoutes from './routes/sections.js';
+import tagRoutes from './routes/tags.js';
 import influenceRoutes from './routes/influence.js';
 import assetRulesRouter from './routes/asset-rules.js';
+import rewardRoutes from './routes/rewards.js';
+import reportRoutes from './routes/reports.js';
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware } from './services/auth.service.js';
 import { AppError } from './lib/errors.js';
 import { initDatabase } from './data/init-db.js';
 import { initWebSocket } from './lib/websocket.js';
 import { rawQuery } from './models/repository.js';
+import { runScheduler, checkHeartbeatTimeout } from './services/ai-session.service.js';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './swagger.js';
 
 dotenv.config();
 
 const app = express();
 
-// 简易限流
-const rateLimitMap = new Map();
-const rateLimiter = (max = 100, windowMs = 60000) => (req, res, next) => {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  const r = rateLimitMap.get(ip) || { count: 0, start: now };
-  if (now - r.start > windowMs) { r.count = 0; r.start = now; }
-  r.count++;
-  rateLimitMap.set(ip, r);
-  // 定期清理过期条目（防止内存泄漏）
-  if (rateLimitMap.size > 10000) {
-    for (const [k, v] of rateLimitMap) {
-      if (now - v.start > windowMs) rateLimitMap.delete(k);
-    }
-  }
-  if (r.count > max) return res.status(429).json({ success: false, error: '请求过于频繁，请稍后再试' });
-  next();
-};
 const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// 安全头（开发模式关闭 CSP）
-app.use(helmet({ contentSecurityPolicy: false }));
+// 安全头（SEC-05: 启用 CSP）
+app.use(helmet({
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'", 'ws:', 'wss:'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false,  // 开发环境关闭 CSP 以支持 Swagger UI
+  crossOriginEmbedderPolicy: false,  // 避免影响前端静态资源加载
+}));
 
 // Gzip 压缩
 app.use(compression());
 
-// 跨域
+// 跨域（SEC-13: 开发环境也限制为 localhost:5173）
 app.use(cors({
-  origin: isProduction ? (process.env.CORS_ORIGIN || false) : true,
+  origin: isProduction
+    ? (process.env.CORS_ORIGIN || false)
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
 }));
 
@@ -88,22 +98,61 @@ app.use((req, res, next) => {
   next();
 });
 
-// 全局限流：每 IP 每分钟 200 次
-app.use(rateLimiter(200, 60000));
+// 全局限流：每 IP 每分钟 200 次（所有环境生效）
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '请求过于频繁，请稍后再试' },
+}));
 
 // 静态文件服务（上传的文件）
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
+  maxAge: '7d',
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  },
+}));
 
-// 认证敏感路由加严限流（防暴力破解）— 开发环境不限流
-if (isProduction) {
-  app.use('/api/auth/login', rateLimiter(10, 60000));
-  app.use('/api/auth/register', rateLimiter(5, 60000));
+// 认证敏感路由加严限流（防暴力破解）— 所有环境均生效
+app.use('/api/auth/login', rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '登录尝试过于频繁，请 1 分钟后再试' },
+}));
+app.use('/api/auth/register', rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '注册请求过于频繁，请稍后再试' },
+}));
+
+// Swagger API 文档（仅非生产环境）
+if (!isProduction) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'AILL API 文档',
+  }));
+  // JSON 格式 spec 供工具消费
+  app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
 }
 
 // 公开路由（只读）
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/posts', rewardRoutes);
+app.use('/api/posts', reportRoutes);
 app.use('/api/hot-topics', hotTopicRoutes);
+app.use('/api/sections', sectionRoutes);
+app.use('/api/tags', tagRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dict', dictRoutes);
@@ -157,7 +206,7 @@ app.get('/api/health', async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: 'Health check failed', message: err.message });
+    res.status(500).json({ success: false, error: 'Health check failed' });
   }
 });
 
@@ -193,8 +242,23 @@ const startServer = async () => {
 ║  Environment: ${process.env.NODE_ENV || 'development'}
 ║  Database: PostgreSQL                                      ║
 ║  WebSocket: Enabled                                       ║
+║  API Docs: http://localhost:${PORT}/api-docs                ║
 ╚═══════════════════════════════════════════════════════════╝
       `);
+
+      // AI 调度器定时任务
+      setInterval(async () => {
+        try {
+          await runScheduler();
+        } catch (err) { console.error('[Scheduler] runScheduler error:', err.message); }
+      }, 5 * 60 * 1000); // 每 5 分钟
+
+      setInterval(async () => {
+        try {
+          const result = await checkHeartbeatTimeout();
+          if (result.deactivated > 0) console.log(`[Scheduler] deactivated ${result.deactivated} AI sessions`);
+        } catch (err) { console.error('[Scheduler] heartbeat timeout error:', err.message); }
+      }, 2 * 60 * 1000); // 每 2 分钟
     });
   } catch (error) {
     console.error('Failed to start server:', error);

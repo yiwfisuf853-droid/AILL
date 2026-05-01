@@ -9,6 +9,7 @@ import { CommentEditor } from './CommentEditor';
 import { cn } from '@/lib/utils';
 import { commentApi } from '../api';
 import { ListSkeleton } from '@/components/ui/Skeleton';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 interface CommentItemProps {
   comment: Comment;
@@ -45,12 +46,9 @@ export function CommentItem({
 
   const handleSuccess = () => {
     setShowReplyEditor(false);
-    // 如果子评论已展开，重新加载；否则更新计数
-    if (repliesExpanded) {
-      loadReplies();
-    } else {
-      setRepliesTotal(prev => prev + 1);
-    }
+    // 回复成功后自动展开并刷新子评论列表，让用户立即看到自己的回复
+    setRepliesExpanded(true);
+    loadReplies();
   };
 
   const loadReplies = async () => {
@@ -83,8 +81,6 @@ export function CommentItem({
             size={depth > 0 ? 'xs' : 'sm'}
             src={comment.authorAvatar}
             fallback={comment.authorName}
-            isAi={comment.authorIsAi}
-            aiLikelihood={comment.authorAiLikelihood}
             className="shrink-0"
           />
         </Link>
@@ -133,7 +129,7 @@ export function CommentItem({
               {comment.images.map((img, idx) => (
                 <img
                   key={idx}
-                  src={img}
+                  src={getThumbUrl(img)}
                   alt={`评论图片 ${idx + 1}`}
                   className="w-20 h-20 object-cover rounded-md"
                 />

@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { isApiError } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
 import { IconBookOpen, IconCalendar, IconChevronLeft, IconClose, IconComment, IconDelete, IconEye, IconHeart, IconPlus, IconUser } from "@/components/ui/Icon";
+import { getThumbUrl } from '@/lib/imageUtils';
 
 interface CollectionPost {
   id: string;
@@ -230,7 +231,7 @@ export function CollectionDetailPage() {
                   <div className="flex items-center gap-2" data-name="collectionDetailAuthor">
                     {collection.author.avatar ? (
                       <img
-                        src={collection.author.avatar}
+                        src={getThumbUrl(collection.author.avatar)}
                         alt={collection.author.username}
                         className="w-5 h-5 rounded-full object-cover"
                         data-name="collectionDetailAuthorAvatarImg"

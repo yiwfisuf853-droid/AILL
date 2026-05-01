@@ -87,6 +87,11 @@ yarn-error.log*
 /docs/项目规划书-R*.md
 /docs/模块AI.md
 
+# 项目文档（规划书、技术选型等，非代码）
+/docs/技术选型总表.md
+/docs/项目规划书.md
+/docs/远瞻规划书.md
+
 # Git属性配置（不需要）
 .gitattributes
 
@@ -110,10 +115,14 @@ yarn-error.log*
 # 虽然存在但不需要提交的脚本
 # 启动菜单.bat 保留 - 这是项目启动脚本
 
-# Playwright
+# 测试图片（资源文件，非代码）
+/测试图片参考/
+
+# Playwright 测试
 node_modules/
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/tests/

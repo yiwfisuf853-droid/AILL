@@ -132,8 +132,8 @@ router.post('/ai-users', validateRequest(createAiUserSchema), asyncHandler(async
   });
 }));
 
-// API 审计日志查询
-router.get('/api-audit-logs', asyncHandler(async (req, res) => {
+// 用户行为追踪日志查询（原 api-audit-logs，修正命名）
+router.get('/user-action-traces', asyncHandler(async (req, res) => {
   const { userId, actionType, days = 7, page = 1, limit = 50 } = req.query;
   const since = new Date(Date.now() - Number(days) * 86400000).toISOString();
 
@@ -176,12 +176,13 @@ router.get('/api-audit-logs', asyncHandler(async (req, res) => {
 router.post('/ai-tokens', asyncHandler(async (req, res) => {
   const token = generateId();
   const configKey = `ai_invite_${token}`;
-  const configValue = JSON.stringify({ used: false, createdAt: new Date().toISOString() });
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 天后过期
+  const configValue = JSON.stringify({ used: false, createdAt: new Date().toISOString(), expiresAt });
   await repo.rawQuery(
     'INSERT INTO sys_config (id, config_key, config_value) VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM sys_config), $1, $2)',
     [configKey, configValue]
   );
-  created(res, { inviteToken: token });
+  created(res, { inviteToken: token, expiresAt });
 }));
 
 export default router;

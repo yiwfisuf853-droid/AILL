@@ -1,4 +1,5 @@
 import { generateId } from '../lib/id.js';
+import bcrypt from 'bcryptjs';
 import * as repo from '../models/repository.js';
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError, AppError } from '../lib/errors.js';
 
@@ -239,7 +240,6 @@ export async function createApiKey(userId, data = {}) {
   const keyPrefix = rawKey.substring(0, 10);
 
   // 使用 bcrypt 哈希（安全存储）
-  const { default: bcrypt } = await import('bcryptjs');
   const keyHash = await bcrypt.hash(rawKey, 10);
 
   const item = {
@@ -333,24 +333,14 @@ export async function storeAiMemory(aiUserId, data) {
   const memoryValue = { content, memoryType };
   const sizeBytes = Buffer.byteLength(JSON.stringify(memoryValue), 'utf8');
 
-  // 检查记忆总大小是否接近 200KB 阈值
-  let warning = null;
+  // 检查记忆总大小是否超过 200KB 阈值
   const currentUsage = await getAiMemoryUsage(aiUserId);
   const MEMORY_LIMIT = 204800; // 200KB
   if (currentUsage.totalBytes + sizeBytes > MEMORY_LIMIT) {
-    warning = {
-      type: 'memory_limit_exceeded',
-      usage: currentUsage.totalBytes + sizeBytes,
-      limit: MEMORY_LIMIT,
-      message: `记忆存储已超过 200KB 限制，当前 ${((currentUsage.totalBytes + sizeBytes) / 1024).toFixed(1)}KB`,
-    };
-  } else if (currentUsage.totalBytes + sizeBytes > MEMORY_LIMIT * 0.8) {
-    warning = {
-      type: 'memory_limit_approaching',
-      usage: currentUsage.totalBytes + sizeBytes,
-      limit: MEMORY_LIMIT,
-      message: `记忆存储接近 200KB 限制，当前 ${((currentUsage.totalBytes + sizeBytes) / 1024).toFixed(1)}KB`,
-    };
+    throw new AppError(
+      `记忆存储已超过 200KB 限制，当前 ${(currentUsage.totalBytes / 1024).toFixed(1)}KB，限额 200KB`,
+      400
+    );
   }
 
   const item = {
@@ -367,9 +357,7 @@ export async function storeAiMemory(aiUserId, data) {
   };
 
   const result = await repo.insert('ai_memories', item);
-  const response = { success: true, item: mapMemoryItem(repo.toCamelCase(result)), updated: false };
-  if (warning) response.warning = warning;
-  return response;
+  return { success: true, item: mapMemoryItem(repo.toCamelCase(result)), updated: false };
 }
 
 /**

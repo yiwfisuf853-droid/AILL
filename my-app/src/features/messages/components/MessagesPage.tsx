@@ -5,6 +5,7 @@ import { messageApi, type Conversation, type Message, type CreateConversationRes
 import { useSocket } from '@/hooks/useSocket';
 import { useMessageStore } from '../store';
 import { IconComment, IconPlus, IconChevronLeft, IconSend } from '@/components/ui/Icon';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 export function MessagesPage() {
   const { user } = useAuthStore();
@@ -74,9 +75,11 @@ export function MessagesPage() {
       setActiveConversation(null);
       return;
     }
+    // 加入 WebSocket 会话房间
+    emit('join-conversation', activeConv);
     messageApi.getMessages(user.id, activeConv).then(setMessages).catch(() => {});
     messageApi.getConversationDetail(user.id, activeConv).then(setActiveConversation).catch(() => {});
-  }, [user, activeConv]);
+  }, [user, activeConv, emit]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -132,8 +135,8 @@ export function MessagesPage() {
                       activeConv === c.id ? 'bg-primary/8' : 'hover:bg-muted/40'
                     }`}>
                     {otherParticipant?.avatar && (
-                      <img 
-                        src={otherParticipant.avatar} 
+                      <img
+                        src={getThumbUrl(otherParticipant.avatar)}
                         alt={displayName}
                         className="w-7 h-7 rounded-full object-cover shrink-0"
                         data-name={`messagesConversation${c.id}Avatar`}
@@ -142,9 +145,6 @@ export function MessagesPage() {
                     <div className="flex-1 min-w-0">
                       <div data-name={`messagesConversation${c.id}Name`} className="text-xs font-medium text-foreground truncate flex items-center gap-1">
                         {displayName}
-                        {otherParticipant?.isAi && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">AI</span>
-                        )}
                       </div>
                       {c.lastMessage && (
                         <div data-name={`messagesConversation${c.id}LastMessage`} className="text-xs text-foreground-tertiary truncate mt-0.5">{c.lastMessage.content}</div>
@@ -174,7 +174,7 @@ export function MessagesPage() {
               <div data-name="messagesConversationHeader" className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card/50">
                 {activeConversation?.participants?.[0]?.avatar && (
                   <img 
-                    src={activeConversation.participants[0].avatar} 
+                    src={getThumbUrl(activeConversation.participants[0].avatar)} 
                     alt={activeConversation.participants[0].username}
                     className="w-9 h-9 rounded-full object-cover"
                     data-name="messagesConversationAvatar"
@@ -185,7 +185,7 @@ export function MessagesPage() {
                     {activeConversation?.participants?.[0]?.username || '未知用户'}
                   </div>
                   <div data-name="messagesConversationStatus" className="text-xs text-foreground-tertiary">
-                    {activeConversation?.participants?.[0]?.isAi ? 'AI 用户' : '在线'}
+                    在线
                   </div>
                 </div>
               </div>

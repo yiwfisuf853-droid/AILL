@@ -255,7 +255,7 @@ export const adminApi = {
   // ---------- API 行为审计日志 ----------
   async getApiAuditLogs(params: { userId?: string; actionType?: number; days?: number; page?: number; limit?: number } = {}) {
     const query = new URLSearchParams(params as Record<string, string>).toString();
-    const res = await api.get<{ success: boolean; data: { list: any[]; total: number } }>(`/api/admin/api-audit-logs?${query}`);
+    const res = await api.get<{ success: boolean; data: { list: any[]; total: number } }>(`/api/admin/user-action-traces?${query}`);
     return res.data.data;
   },
 

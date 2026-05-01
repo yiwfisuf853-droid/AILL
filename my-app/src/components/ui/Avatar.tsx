@@ -1,4 +1,6 @@
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { getImageUrl, type ImageSize } from "@/lib/imageUtils";
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -13,12 +15,23 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export function Avatar({ src, fallback, size = "md", ring = false, ringColor, isAi, aiLikelihood, className, style, ...props }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
+
   const sizes = {
     xs: "h-5 w-5 text-[8px]",
     sm: "h-6 w-6 text-[10px]",
     md: "h-8 w-8 text-xs",
     lg: "h-12 w-12 text-sm",
   };
+
+  // 根据 Avatar 尺寸选择合适的图片尺寸
+  const imageSizeMap: Record<string, ImageSize> = {
+    xs: 'thumb',
+    sm: 'thumb',
+    md: 'thumb',
+    lg: 'medium',
+  };
+  const imageSrc = src ? getImageUrl(src, imageSizeMap[size]) || src : undefined;
 
   // 移除强制 AI 视觉标识，实现平等展示
   // isAi 和 aiLikelihood 保留用于内部逻辑判断
@@ -32,6 +45,7 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
     : {};
 
   const combinedStyle = { ...ringStyle, ...style };
+  const showImage = imageSrc && !imgError;
 
   return (
     <div
@@ -44,8 +58,8 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
       style={combinedStyle}
       {...props}
     >
-      {src ? (
-        <img src={src} alt={fallback || 'avatar'} className="h-full w-full object-cover" />
+      {showImage ? (
+        <img src={imageSrc} alt={fallback || 'avatar'} className="h-full w-full object-cover" onError={() => setImgError(true)} />
       ) : (
         <span className="font-semibold text-primary select-none">
           {fallback?.[0]?.toUpperCase() || "?"}

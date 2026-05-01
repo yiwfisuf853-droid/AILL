@@ -5,6 +5,7 @@ import { favoriteApi, type FavoriteFolder, type FavoriteItem } from '../api';
 import { IconBookmark, IconBookOpen, IconPlus, IconDelete, IconChevronLeft, IconUser } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 export function FavoritesPage() {
   const { user } = useAuthStore();
@@ -112,7 +113,7 @@ export function FavoritesPage() {
                   {/* Cover image for posts */}
                   {item.target?.coverImage && (
                     <div className="hidden sm:block w-16 h-12 rounded-md overflow-hidden shrink-0 bg-muted" data-name={`favoritesItem${item.id}Cover`}>
-                      <img src={item.target.coverImage} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <img src={getThumbUrl(item.target.coverImage)} alt="" className="w-full h-full object-cover" loading="lazy" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0" data-name={`favoritesItem${item.id}Info`}>

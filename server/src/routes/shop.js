@@ -18,7 +18,8 @@ import {
   getRedemptions,
 } from '../services/shop.service.js';
 import { validateRequest } from '../middleware/validate.js';
-import { createProductSchema, addToCartSchema, createOrderSchema } from '../validations/shop.js';
+import { createProductSchema, addToCartSchema, createOrderSchema, updateProductSchema, updateCartSchema } from '../validations/shop.js';
+import { ownershipMiddleware } from '../middleware/ownership.js';
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ router.post('/products', validateRequest(createProductSchema), asyncHandler(asyn
 }));
 
 // 更新商品
-router.patch('/products/:id', asyncHandler(async (req, res) => {
+router.patch('/products/:id', validateRequest(updateProductSchema), asyncHandler(async (req, res) => {
   const result = await updateProduct(req.params.id, req.body);
   success(res, result);
 }));
@@ -56,26 +57,26 @@ router.delete('/products/:id', asyncHandler(async (req, res) => {
 
 // ========== 购物车 ==========
 
-// 获取购物车
-router.get('/cart/:userId', asyncHandler(async (req, res) => {
+// 获取购物车（仅限本人）
+router.get('/cart/:userId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const result = await getCart(req.params.userId);
   success(res, result);
 }));
 
-// 添加到购物车
-router.post('/cart/:userId', validateRequest(addToCartSchema), asyncHandler(async (req, res) => {
+// 添加到购物车（仅限本人）
+router.post('/cart/:userId', ownershipMiddleware(), validateRequest(addToCartSchema), asyncHandler(async (req, res) => {
   const result = await addToCart(req.params.userId, req.body);
   created(res, result);
 }));
 
-// 更新购物车项
-router.patch('/cart/:userId/:cartItemId', asyncHandler(async (req, res) => {
+// 更新购物车项（仅限本人）
+router.patch('/cart/:userId/:cartItemId', ownershipMiddleware(), validateRequest(updateCartSchema), asyncHandler(async (req, res) => {
   const result = await updateCartItem(req.params.userId, req.params.cartItemId, req.body);
   success(res, result);
 }));
 
-// 清空购物车
-router.delete('/cart/:userId', asyncHandler(async (req, res) => {
+// 清空购物车（仅限本人）
+router.delete('/cart/:userId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   await clearCart(req.params.userId);
   deleted(res);
 }));
@@ -90,8 +91,8 @@ router.post('/orders', validateRequest(createOrderSchema), asyncHandler(async (r
   created(res, result);
 }));
 
-// 订单列表
-router.get('/orders/:userId', asyncHandler(async (req, res) => {
+// 订单列表（仅限本人）
+router.get('/orders/:userId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const result = await getOrders(req.params.userId, req.query);
   success(res, result);
 }));
@@ -112,8 +113,8 @@ router.post('/orders/:orderId/cancel', asyncHandler(async (req, res) => {
 
 // ========== 兑换记录 ==========
 
-// 兑换记录列表
-router.get('/redemptions/:userId', asyncHandler(async (req, res) => {
+// 兑换记录列表（仅限本人）
+router.get('/redemptions/:userId', ownershipMiddleware(), asyncHandler(async (req, res) => {
   const result = await getRedemptions(req.params.userId, req.query);
   success(res, result);
 }));

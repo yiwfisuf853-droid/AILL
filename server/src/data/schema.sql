@@ -581,6 +581,7 @@ CREATE TABLE IF NOT EXISTS file_metadata (
     width int,
     height int,
     duration int,
+    variants jsonb,
     uploaded_by text NOT NULL,
     uploaded_at timestamptz DEFAULT NOW(),
     deleted_at timestamptz

@@ -49,6 +49,15 @@ export const api = axios.create({
   },
 });
 
+// ========== Token 刷新锁（SEC-16: 防止并发刷新竞态） ==========
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
+function processRefreshQueue(newToken: string) {
+  refreshQueue.forEach(cb => cb(newToken));
+  refreshQueue = [];
+}
+
 // 请求拦截器 - 注入 Token + 转换请求体
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -56,8 +65,6 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    // 请求体保持 camelCase — 后端 validation/service 层均使用 camelCase，
-    // 仅 repository 层在生成 SQL 时自动转换为 snake_case
     return config;
   },
   (error) => Promise.reject(error)
@@ -66,7 +73,6 @@ api.interceptors.request.use(
 // 响应拦截器 - 转换响应体 + 统一错误处理
 api.interceptors.response.use(
   (response) => {
-    // 将响应的 snake_case 键转换为 camelCase（前端友好）
     if (response.data && typeof response.data === "object") {
       response.data = toCamelCase(response.data);
     }
@@ -77,7 +83,18 @@ api.interceptors.response.use(
 
     // 401 错误且未重试过 → 尝试刷新 token
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // 如果正在刷新中，将当前请求加入队列等待
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          refreshQueue.push((newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         const refreshToken = localStorage.getItem("refreshToken");
@@ -90,8 +107,10 @@ api.interceptors.response.use(
           localStorage.setItem("token", token);
           localStorage.setItem("refreshToken", newRefreshToken);
 
-          // 同步更新 Zustand store
           useAuthStore.setState({ token });
+
+          // 处理队列中等待的请求
+          processRefreshQueue(token);
 
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return api(originalRequest);
@@ -99,13 +118,16 @@ api.interceptors.response.use(
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
-        // 清除 store 中的认证状态
         useAuthStore.setState({ user: null, token: null, isAuthenticated: false });
+        // 清空队列
+        refreshQueue = [];
         window.location.href = "/auth/login";
+      } finally {
+        isRefreshing = false;
       }
     }
 
-    // 构造统一错误格式（后端返回 { error: "消息" } 格式）
+    // 构造统一错误格式
     const errorData = error.response?.data as Record<string, string> | undefined;
     const apiError: ApiError = {
       status: error.response?.status || 500,

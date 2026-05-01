@@ -14,6 +14,7 @@ import { InfluenceScore } from '@/components/ui/InfluenceScore';
 import { useSubscriptionsStore } from '@/features/subscriptions/store';
 import { SubscriptionType } from '@/features/subscriptions/types';
 import { IconAI, IconBookOpen, IconChevronLeft, IconClock, IconComment, IconEye, IconGroup, IconHeart, IconMail, IconSettings, IconShare, IconShield, IconStar, IconUser, IconLock, IconNotification } from "@/components/ui/Icon";
+import { getImageUrl, getThumbUrl } from '@/lib/imageUtils';
 
 type TabKey = 'posts' | 'following' | 'followers';
 
@@ -254,7 +255,7 @@ export function UserProfilePage() {
             <div className="relative shrink-0" data-name="userProfileAvatarWrapper">
               {profile.avatar ? (
                 <img
-                  src={profile.avatar}
+                  src={getImageUrl(profile.avatar, 'medium')}
                   alt={profile.username}
                   className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover ring-2 ring-primary/30 ring-offset-2 ring-offset-background"
                   data-name="userProfileAvatarImg"
@@ -264,8 +265,8 @@ export function UserProfilePage() {
                   <IconUser size={48} className="text-primary/60" />
                 </div>
               )}
-              {/* AI indicator overlay */}
-              {profile.isAi && (
+              {/* AI indicator overlay — only visible to self */}
+              {isSelf && profile.isAi && (
                 <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-[hsl(270,70%,55%)] flex items-center justify-center shadow-lg border-2 border-background" data-name="userProfileAiIndicator">
                   <IconAI size={16} className="text-white" />
                 </div>
@@ -426,10 +427,11 @@ export function UserProfilePage() {
 
       <div className="py-6 pb-16" data-name="userProfileContent">
         {/* AI Trust & Assets cards */}
-        {(profile.isAi || assets) && (
+        {/* AI Trust & Assets cards — AI info only visible to self */}
+        {(isSelf && profile.isAi || assets) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8" data-name="userProfileCardsGrid">
-            {/* AI Trust Indicator */}
-            {profile.isAi && (
+            {/* AI Trust Indicator — only visible to self */}
+            {isSelf && profile.isAi && (
               <div className="sidebarCard" data-name="userProfileAiTrustCard">
                 <div className="flex items-center gap-2 mb-4" data-name="userProfileAiTrustHeader">
                   <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10" data-name="userProfileAiTrustIcon">
@@ -593,7 +595,7 @@ export function UserProfilePage() {
                       {post.coverImage && (
                         <div className="hidden sm:block w-24 h-16 rounded-md overflow-hidden shrink-0 bg-muted" data-name={`userProfilePost${post.id}Cover`}>
                           <img
-                            src={post.coverImage}
+                            src={getThumbUrl(post.coverImage)}
                             alt={post.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
@@ -667,7 +669,7 @@ export function UserProfilePage() {
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-muted border border-border" data-name={`userProfileFollowingUserAvatar${u.id}`}>
                       {u.avatar ? (
-                        <img src={u.avatar} alt={u.username} className="w-full h-full object-cover" />
+                        <img src={getThumbUrl(u.avatar)} alt={u.username} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center" data-name={`userProfileFollowingAvatar${u.id}Placeholder`}>
                           <IconUser size={20} className="text-foreground-tertiary" />
@@ -679,9 +681,6 @@ export function UserProfilePage() {
                         <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
                           {u.username}
                         </span>
-                        {u.isAi && (
-                          <IconStar size={12} className="text-primary" />
-                        )}
                       </div>
                       {u.bio && (
                         <p className="text-xs text-foreground-tertiary truncate mt-0.5" data-name={`userProfileFollowingUserBio${u.id}`}>{u.bio}</p>
@@ -722,7 +721,7 @@ export function UserProfilePage() {
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-muted border border-border" data-name={`userProfileFollowerAvatar${u.id}`}>
                       {u.avatar ? (
-                        <img src={u.avatar} alt={u.username} className="w-full h-full object-cover" />
+                        <img src={getThumbUrl(u.avatar)} alt={u.username} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center" data-name={`userProfileFollowerAvatar${u.id}Placeholder`}>
                           <IconUser size={20} className="text-foreground-tertiary" />
@@ -734,9 +733,6 @@ export function UserProfilePage() {
                         <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
                           {u.username}
                         </span>
-                        {u.isAi && (
-                          <IconStar size={12} className="text-primary" />
-                        )}
                       </div>
                       {u.bio && (
                         <p className="text-xs text-foreground-tertiary truncate mt-0.5" data-name={`userProfileFollowerBio${u.id}`}>{u.bio}</p>

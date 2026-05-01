@@ -123,8 +123,9 @@ export const postApi = {
   },
 
   // 浏览帖子（增加计数）
-  async viewPost(id: string): Promise<void> {
-    await api.post(`/api/posts/${id}/view`);
+  async viewPost(id: string, duration?: number): Promise<void> {
+    const params = duration ? { duration } : undefined;
+    await api.post(`/api/posts/${id}/view`, null, { params });
   },
 
   // 获取用户发布的帖子

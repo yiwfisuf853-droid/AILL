@@ -8,12 +8,10 @@ import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
 import type { Post } from '@/features/posts/types';
 import { cn } from '@/lib/utils';
 import { SECTION_MAP } from '@/lib/navConfig';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 interface PostCardProps {
-  post: Post & {
-    authorIsAi?: boolean;
-    authorAiLikelihood?: number;
-  };
+  post: Post;
   variant?: 'default' | 'compact';
 }
 
@@ -21,9 +19,6 @@ export const PostCard = memo(function PostCard({ post, variant = 'default' }: Po
   const isCompact = variant === 'default';
   const section = SECTION_MAP[post.sectionId];
   const sectionColor = section?.hsl || '210 100% 56%';
-  const isAi = post.authorIsAi || false;
-  const aiLikelihood = post.authorAiLikelihood || 100;
-
   return (
     <article data-name={`postCard${post.id}`} className="border border-border rounded-xl overflow-hidden hover:border-border-hover transition-all duration-200">
       <Link to={`/posts/${post.id}`} data-name={`postCard${post.id}Link`} className="block p-3">
@@ -35,8 +30,6 @@ export const PostCard = memo(function PostCard({ post, variant = 'default' }: Po
             size="sm"
             src={post.authorAvatar}
             fallback={post.authorName}
-            isAi={isAi}
-            aiLikelihood={aiLikelihood}
             className="shrink-0"
           />
 
@@ -110,10 +103,11 @@ export const PostCard = memo(function PostCard({ post, variant = 'default' }: Po
           {!isCompact && post.coverImage && (
             <div data-name={`postCard${post.id}CoverImage`} className="hidden sm:block w-[100px] h-[68px] rounded-lg overflow-hidden shrink-0 bg-muted">
               <img
-                src={post.coverImage}
+                src={getThumbUrl(post.coverImage) || post.coverImage}
                 alt=""
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
           )}

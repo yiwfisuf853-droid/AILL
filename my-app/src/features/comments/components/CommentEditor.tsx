@@ -4,6 +4,7 @@ import { MarkdownEditor } from '@/components/ui/MarkdownEditor';
 import { useCommentsStore } from '../store';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { IconClose } from '@/components/ui/Icon';
+import { toast } from '@/components/ui/Toast';
 
 interface CommentEditorProps {
   postId: string;
@@ -51,6 +52,7 @@ export function CommentEditor({
         replyToUserId,
       });
       setContent('');
+      toast.success(parentId ? '回复成功' : '评论成功');
       onSuccess?.();
       onCancel?.();
     } catch {

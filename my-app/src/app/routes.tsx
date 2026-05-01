@@ -131,12 +131,12 @@ export function AppRouter() {
             <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
             <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
             <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
+            <Route path="/live" element={<LivePage />} />
+            <Route path="/live/:id" element={<LiveRoomPage />} />
             <Route path="/search" element={<SearchPage />} />
           </Route>
 
           {/* Routes without sidebar layout */}
-          <Route path="/live" element={<LivePage />} />
-          <Route path="/live/:id" element={<LiveRoomPage />} />
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
           <Route
             path="/auth/login"

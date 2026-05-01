@@ -1,5 +1,6 @@
 import { generateId } from '../lib/id.js';
 import * as repo from '../models/repository.js';
+import pg from '../models/pg.js';
 import { ValidationError, NotFoundError, ConflictError, AppError } from '../lib/errors.js';
 
 // ========== 商品 ==========
@@ -170,74 +171,93 @@ export async function clearCart(userId) {
 // ========== 订单 ==========
 
 /**
- * 创建订单
+ * 创建订单（使用事务 + SELECT FOR UPDATE 防止超卖）
  */
 export async function createOrder(userId, data) {
   if (!data.items || data.items.length === 0) throw new ValidationError('订单不能为空');
 
-  let totalAmount = 0;
-  let totalPoints = 0;
-  const orderItems = [];
+  const client = await pg.getClient();
+  try {
+    await client.query('BEGIN');
 
-  for (const item of data.items) {
-    const productRes = await repo.rawQuery(
-      'SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL AND status = 1',
-      [item.productId]
+    let totalAmount = 0;
+    let totalPoints = 0;
+    const orderItems = [];
+
+    for (const item of data.items) {
+      // 使用 FOR UPDATE 锁定商品行，防止并发超卖
+      const productRes = await client.query(
+        'SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL AND status = 1 FOR UPDATE',
+        [item.productId]
+      );
+      if (!productRes.rows || productRes.rows.length === 0) throw new NotFoundError(`商品 ${item.productId} 不存在或已下架`);
+      const product = repo.toCamelCase(productRes.rows[0]);
+
+      const quantity = item.quantity || 1;
+
+      if (product.stock > 0 && product.stock < quantity) {
+        throw new AppError(`商品 ${product.name} 库存不足`, 400);
+      }
+
+      const itemAmount = (product.price || 0) * quantity;
+      const itemPoints = (product.pointsPrice || 0) * quantity;
+
+      totalAmount += itemAmount;
+      totalPoints += itemPoints;
+
+      orderItems.push({
+        id: generateId(),
+        productId: product.id,
+        quantity,
+        price: product.price || 0,
+        pointsPrice: product.pointsPrice || 0,
+        createdAt: new Date().toISOString(),
+      });
+
+      // 在事务内扣减库存
+      if (product.stock > 0) {
+        await client.query(
+          'UPDATE products SET stock = stock - $1, updated_at = NOW() WHERE id = $2',
+          [quantity, product.id]
+        );
+      }
+    }
+
+    const orderNo = 'ORD' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+    const orderId = generateId();
+    const now = new Date().toISOString();
+
+    const orderRes = await client.query(
+      `INSERT INTO orders (id, user_id, total_amount, total_points, status, payment_method, paid_at, remark, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [orderId, userId, totalAmount, totalPoints, 1, null, null, data.remark || '', now, now]
     );
-    if (!productRes.rows || productRes.rows.length === 0) throw new NotFoundError(`商品 ${item.productId} 不存在或已下架`);
-    const product = repo.toCamelCase(productRes.rows[0]);
 
-    if (product.stock > 0 && product.stock < (item.quantity || 1)) {
-      throw new AppError(`商品 ${product.name} 库存不足`, 400);
+    for (const oi of orderItems) {
+      await client.query(
+        `INSERT INTO order_items (id, order_id, product_id, quantity, price, points_price, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [oi.id, orderId, oi.productId, oi.quantity, oi.price, oi.pointsPrice, oi.createdAt]
+      );
     }
 
-    const quantity = item.quantity || 1;
-    const itemAmount = (product.price || 0) * quantity;
-    const itemPoints = (product.pointsPrice || 0) * quantity;
-
-    totalAmount += itemAmount;
-    totalPoints += itemPoints;
-
-    orderItems.push({
-      id: generateId(),
-      productId: product.id,
-      quantity,
-      price: product.price || 0,
-      pointsPrice: product.pointsPrice || 0,
-      createdAt: new Date().toISOString(),
-    });
-
-    // 扣减库存
-    if (product.stock > 0) {
-      await repo.increment('products', product.id, 'stock', -quantity);
+    // 清空购物车
+    if (data.fromCart) {
+      await client.query(
+        'UPDATE carts SET deleted_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL',
+        [userId]
+      );
     }
+
+    await client.query('COMMIT');
+
+    return { success: true, order: repo.toCamelCase(orderRes.rows[0]), items: orderItems };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const orderNo = 'ORD' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
-
-  const order = await repo.insert('orders', {
-    id: generateId(),
-    userId,
-    totalAmount,
-    totalPoints,
-    status: 1, // 1=待支付
-    paymentMethod: data.paymentMethod || null,
-    paidAt: null,
-    remark: data.remark || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  for (const oi of orderItems) {
-    await repo.insert('order_items', { ...oi, orderId: order.id });
-  }
-
-  // 清空购物车
-  if (data.fromCart) {
-    await repo.updateWhere('carts', { userId, deletedAt: null }, { deletedAt: new Date().toISOString() });
-  }
-
-  return { success: true, order, items: orderItems };
 }
 
 /**

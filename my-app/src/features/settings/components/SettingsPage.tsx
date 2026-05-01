@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
 import { userApi } from '@/features/users/api';
-import { IconChevronLeft, IconUser, IconLock, IconSave, IconRefresh, IconSettings, IconGroup } from '@/components/ui/Icon';
+import { IconChevronLeft, IconUser, IconLock, IconSave, IconRefresh, IconSettings, IconGroup, IconSun, IconMoon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { FileUpload } from '@/components/ui/FileUpload';
 import type { User as UserType } from '@/features/auth/types';
 import { SECTIONS, SIDEBAR_PERSONAL_ITEMS, getSidebarConfig, saveSidebarConfig, type SidebarConfig } from '@/lib/navConfig';
 import { getUserPreferences, saveUserPreferences, type UserPreferences } from '@/lib/userPreferences';
+import { useTheme } from '@/hooks/useTheme';
 
-type Tab = 'profile' | 'password' | 'sidebar' | 'layout';
+type Tab = 'profile' | 'password' | 'layout' | 'sidebar' | 'appearance';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export function SettingsPage() {
   const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>(getSidebarConfig);
   const [layoutPrefs, setLayoutPrefs] = useState<UserPreferences>(getUserPreferences());
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (!user) return;
@@ -99,13 +101,13 @@ export function SettingsPage() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-foreground-tertiary hover:text-foreground transition-colors text-sm" data-name="settingsBackBtn">
           <IconChevronLeft size={16} /> 返回
         </button>
-        <div className="section-header-bar" style={{ background: 'hsl(210,100%,50%)' }} />
+        <div className="sectionHeaderBar" style={{ background: 'hsl(210,100%,50%)' }} />
         <h1 className="text-lg font-bold text-foreground" data-name="settingsTitle">设置</h1>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-0.5 p-0.5 bg-muted/40 rounded-lg w-fit mb-5" data-name="settingsTabs">
-        {([['profile', '个人资料', IconUser], ['password', '修改密码', IconLock], ['layout', '布局设置', IconGroup], ['sidebar', '侧边栏', IconSettings]] as const).map(([key, label, Icon]) => (
+        {([['profile', '个人资料', IconUser], ['password', '修改密码', IconLock], ['appearance', '外观', IconSun], ['layout', '布局设置', IconGroup], ['sidebar', '侧边栏', IconSettings]] as const).map(([key, label, Icon]) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium transition-all ${
               activeTab === key ? 'text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'
@@ -169,6 +171,40 @@ export function SettingsPage() {
           <Button onClick={handleChangePassword} disabled={pwSaving} className="gap-1.5 btn-warm border-0" data-name="settingsChangePasswordBtn">
             {pwSaving ? <IconRefresh size={14} className="animate-spin" /> : <IconLock size={14} />} 修改密码
           </Button>
+        </div>
+      )}
+
+      {activeTab === 'appearance' && (
+        <div className="bg-card border border-border/60 rounded-xl p-5 space-y-4" data-name="settingsAppearanceForm">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3" data-name="settingsAppearanceTitle">主题模式</h3>
+            <div className="grid grid-cols-2 gap-3" data-name="settingsThemeOptions">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  theme === 'light'
+                    ? 'border-[hsl(210,100%,50%)] bg-[hsl(210,100%,50%)]/5'
+                    : 'border-border/60 hover:border-border'
+                }`}
+                data-name="settingsThemeLight"
+              >
+                <IconSun size={24} className={theme === 'light' ? 'text-[hsl(210,100%,50%)]' : 'text-foreground-tertiary'} />
+                <span className={`text-sm font-medium ${theme === 'light' ? 'text-foreground' : 'text-foreground-secondary'}`}>浅色模式</span>
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  theme === 'dark'
+                    ? 'border-[hsl(210,100%,50%)] bg-[hsl(210,100%,50%)]/5'
+                    : 'border-border/60 hover:border-border'
+                }`}
+                data-name="settingsThemeDark"
+              >
+                <IconMoon size={24} className={theme === 'dark' ? 'text-[hsl(210,100%,50%)]' : 'text-foreground-tertiary'} />
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-foreground' : 'text-foreground-secondary'}`}>深色模式</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

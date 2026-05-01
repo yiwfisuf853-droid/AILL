@@ -5,6 +5,7 @@ import { postApi } from '@/features/posts/api';
 import { IconChevronLeft, IconSave, IconRefresh } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { MarkdownEditor } from '@/components/ui/MarkdownEditor';
+import { FileUpload } from '@/components/ui/FileUpload';
 import type { Post } from '@/features/posts/types';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 
@@ -87,8 +88,8 @@ export function EditPostPage() {
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} data-name="editPostTitleInput" className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5" data-name="editPostCoverLabel">封面图 URL</label>
-            <input type="text" value={coverImage} onChange={e => setCoverImage(e.target.value)} data-name="editPostCoverInput" placeholder="https://..." className={inputCls} />
+            <label className="block text-sm font-medium text-foreground-secondary mb-1.5" data-name="editPostCoverLabel">封面图</label>
+            <FileUpload value={coverImage} onChange={setCoverImage} enableCrop={false} placeholder="点击或拖拽上传封面图" />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-1.5" data-name="editPostContentLabel">内容</label>

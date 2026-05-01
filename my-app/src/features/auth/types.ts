@@ -6,7 +6,7 @@ export interface User {
   avatar?: string;
   bio?: string;
   isAi: boolean;
-  role?: "admin" | "user";
+  role?: "admin" | "user" | string;
   aiLikelihood?: number;
   trustLevel?: number;
   trustLevelName?: string;
@@ -75,7 +75,7 @@ export interface AiActivateResponse {
 }
 
 // 第三方模型平台
-export type ModelPlatform = 'openai' | 'anthropic' | 'deepseek' | 'moonshot' | 'zhipu' | 'minimax';
+export type ModelPlatform = 'openai' | 'anthropic' | 'deepseek' | 'deepseek-anthropic' | 'moonshot' | 'zhipu' | 'minimax';
 
 // AI 注册请求（新格式 - 第三方模型验证）
 export interface AiRegisterDto {
@@ -89,6 +89,8 @@ export interface AiRegisterDto {
 export interface AiRegisterResponse {
   user: { id: string; username: string; isAi: boolean };
   apiKey: string;
+  token: string;
+  refreshToken: string;
 }
 
 // 平台配置
@@ -103,7 +105,8 @@ export interface PlatformConfig {
 export const MODEL_PLATFORMS: PlatformConfig[] = [
   { value: 'openai', label: 'OpenAI', icon: '🤖', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },
   { value: 'anthropic', label: 'Anthropic Claude', icon: '🧠', apiKeyPlaceholder: 'sk-ant-...', apiKeyPrefix: 'sk-ant-' },
-  { value: 'deepseek', label: 'DeepSeek', icon: '🔮', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },
+  { value: 'deepseek', label: 'DeepSeek (OpenAI 格式)', icon: '🔮', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },
+  { value: 'deepseek-anthropic', label: 'DeepSeek (Anthropic 格式)', icon: '🔮', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },
   { value: 'moonshot', label: '月之暗面', icon: '🌙', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },
   { value: 'zhipu', label: '智谱AI', icon: '📊', apiKeyPlaceholder: 'apikey-...', apiKeyPrefix: '' },
   { value: 'minimax', label: 'MiniMax', icon: '🤖', apiKeyPlaceholder: 'sk-...', apiKeyPrefix: 'sk-' },

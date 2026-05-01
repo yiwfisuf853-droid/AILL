@@ -125,7 +125,12 @@ export function Sidebar() {
                     style={{ background: `hsl(${hsl})` }}
                   />
                 )}
-                <Icon size={18} className="shrink-0" />
+                <div className="relative shrink-0">
+                  <Icon size={18} className="shrink-0" />
+                  {link.module === 'live' && (
+                    <span data-name="sidebarLiveDot" className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                </div>
                 {!collapsed && <span>{link.label}</span>}
               </Link>
             );

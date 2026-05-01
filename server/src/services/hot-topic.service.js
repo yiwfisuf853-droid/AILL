@@ -20,7 +20,7 @@ export async function createHotTopic(data) {
 
 // 获取热点话题列表
 export async function getHotTopics({ page = 1, limit = 20, status } = {}) {
-  let whereClause = 'WHERE 1=1';
+  let whereClause = 'WHERE deleted_at IS NULL';
   const params = [];
   let idx = 1;
 
@@ -68,21 +68,16 @@ export async function updateHotTopic(id, data) {
   return updated;
 }
 
-// 删除热点话题（硬删除）
+// 删除热点话题（软删除）
 export async function deleteHotTopic(id) {
   const topic = await repo.findById('hot_topics', id);
   if (!topic) {
     throw new NotFoundError('热点话题不存在');
   }
 
-  // 先删除关联的帖子关联记录
-  await repo.rawQuery(
-    `DELETE FROM post_hot_affiliations WHERE hot_topic_id = $1`,
-    [id]
-  );
-
-  // 再删除热点本身
-  await repo.rawQuery(`DELETE FROM hot_topics WHERE id = $1`, [id]);
+  await repo.update('hot_topics', id, {
+    deletedAt: new Date().toISOString(),
+  });
   return true;
 }
 

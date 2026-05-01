@@ -36,6 +36,7 @@ interface PostsState {
   likePost: (id: string) => Promise<void>;
   favoritePost: (id: string) => Promise<void>;
   sharePost: (id: string) => Promise<void>;
+  viewPost: (id: string, duration?: number) => Promise<void>;
 
   // Actions - CRUD
   createPost: (data: PostCreateDto) => Promise<Post>;
@@ -177,6 +178,14 @@ export const usePostsStore = create<PostsState>((set, get) => ({
       }));
     } catch (error) {
       throw error;
+    }
+  },
+
+  viewPost: async (id: string, duration?: number) => {
+    try {
+      await postApi.viewPost(id, duration);
+    } catch {
+      // 浏览记录失败不影响用户体验
     }
   },
 

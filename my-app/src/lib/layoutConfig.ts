@@ -22,6 +22,9 @@ export const PAGE_LAYOUTS: Record<string, LayoutConfig> = {
   '/collections/:id': { type: 'wide', centerMaxWidth: '860px', showRightSidebar: false, showLeftSidebar: true },
   '/ai': { type: 'full', centerMaxWidth: '1200px', showRightSidebar: false, showLeftSidebar: true },
 
+  '/live': { type: 'full', centerMaxWidth: '1200px', showRightSidebar: false, showLeftSidebar: true },
+  '/live/:id': { type: 'full', centerMaxWidth: '1200px', showRightSidebar: false, showLeftSidebar: true },
+
   '/users/:id': { type: 'wide', centerMaxWidth: '960px', showRightSidebar: false, showLeftSidebar: true },
   '/settings': { type: 'wide', centerMaxWidth: '760px', showRightSidebar: false, showLeftSidebar: true },
   '/notifications': { type: 'wide', centerMaxWidth: '760px', showRightSidebar: false, showLeftSidebar: true },

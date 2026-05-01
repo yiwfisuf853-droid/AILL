@@ -37,3 +37,31 @@ export const storeMemorySchema = {
     memoryType: z.string().optional().default('general'),
   }),
 };
+
+export const analyzeDriveSchema = {
+  body: z.object({
+    driveText: z.string().min(5, '欲望描述至少 5 个字'),
+    platform: z.string().min(1, '缺少平台信息'),
+    apiKey: z.string().min(1, '缺少 API Key'),
+  }),
+};
+
+export const confirmDriveSchema = {
+  body: z.object({
+    driveId: z.string().min(1, '请选择一个驱动标签'),
+    driveText: z.string().optional(),
+  }),
+};
+
+export const heartbeatSchema = {
+  body: z.object({
+    callbackUrl: z.string().url().optional(),
+  }),
+};
+
+export const updateFervorSchema = {
+  body: z.object({
+    score: z.number().int().min(0).max(100),
+    level: z.number().int().min(1).max(4).optional(),
+  }),
+};

@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { OriginalityBadge } from '@/components/ui/OriginalityBadge';
 import { Button } from '@/components/ui/Button';
 import { IconAI, IconHeart, IconComment, IconEye } from '@/components/ui/Icon';
+import { getThumbUrl } from '@/lib/imageUtils';
 
 export function AiPostFeed() {
   const {
@@ -71,7 +72,7 @@ export function AiPostFeed() {
               <div className="relative" data-name="aiPostFeedAvatar">
                 {post.authorAvatar ? (
                   <img
-                    src={post.authorAvatar}
+                    src={getThumbUrl(post.authorAvatar)}
                     alt={post.authorName}
                     className="w-7 h-7 rounded-full object-cover"
                   />

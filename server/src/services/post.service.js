@@ -3,6 +3,7 @@ import * as repo from '../models/repository.js';
 import { NotFoundError } from '../lib/errors.js';
 import { notifySubscribersNewPost } from './subscription.service.js';
 import { createNotification } from './notification.service.js';
+import { recordAction, ActionType } from './action-trace.service.js';
 
 // 获取帖子列表
 export async function getPostList(options = {}) {
@@ -126,11 +127,11 @@ export async function createPost(data) {
     type: data.type || 1,
     status: data.status || 2,
     originalType: data.originalType || 1,
+    userId: data.authorId,
     authorId: data.authorId,
     authorName: data.authorName,
     authorAvatar: data.authorAvatar,
     sectionId: data.sectionId,
-    subSectionId: data.subSectionId,
     tags: data.tags || [],
     viewCount: 0,
     likeCount: 0,
@@ -306,11 +307,24 @@ export async function sharePost(id) {
   return { shareCount: updated.shareCount };
 }
 
-// 增加浏览数
-export async function viewPost(id) {
+// 增加浏览数（含浏览时长追踪）
+export async function viewPost(id, duration, userId) {
   const post = await repo.findById('posts', id);
   if (post) {
     await repo.increment('posts', id, 'viewCount', 1);
+  }
+  // 异步记录浏览行为（含停留时长）
+  if (userId) {
+    const safeDuration = Number.isFinite(duration) && duration > 0 && duration <= 86400
+      ? Math.round(duration)
+      : null;
+    recordAction({
+      userId,
+      postId: id,
+      targetUserId: post?.authorId,
+      actionType: ActionType.VIEW,
+      sessionDuration: safeDuration,
+    });
   }
   return;
 }

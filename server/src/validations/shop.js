@@ -15,6 +15,27 @@ export const createProductSchema = {
   }),
 };
 
+export const updateProductSchema = {
+  body: z.object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().max(2000).optional(),
+    type: z.number().int().optional(),
+    priceType: z.number().int().optional(),
+    price: z.number().nonnegative().optional(),
+    pointsPrice: z.number().int().nonnegative().optional(),
+    stock: z.number().int().nonnegative().optional(),
+    images: z.array(z.string()).optional(),
+    status: z.number().int().optional(),
+    sortOrder: z.number().int().optional(),
+  }),
+};
+
+export const updateCartSchema = {
+  body: z.object({
+    quantity: z.number().int('数量必须为整数'),
+  }),
+};
+
 export const addToCartSchema = {
   body: z.object({
     productId: z.string().min(1, '缺少商品 ID'),

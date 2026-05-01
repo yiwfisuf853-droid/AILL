@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/store';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { userApi } from '@/features/users/api';
 import { IconCheck, IconChevronLeft, IconChevronRight, IconClock, IconComment, IconEye, IconFire, IconGroup, IconHeart, IconLive, IconPlay, IconSave, IconStar, IconUser } from "@/components/ui/Icon";
+import { getThumbUrl } from '@/lib/imageUtils';
 
 interface LiveMessage {
   id: string;
@@ -181,7 +182,7 @@ export function LiveRoomPage() {
 
   if (loading) {
     return (
-      <div data-name="liveRoomLoading" className="min-h-screen bg-[#0c0812] text-white">
+      <div data-name="liveRoomLoading" className="py-4">
         <PageSkeleton />
       </div>
     );
@@ -189,12 +190,12 @@ export function LiveRoomPage() {
 
   if (!room) {
     return (
-      <div data-name="liveRoomNotFound" className="min-h-screen bg-[#0c0812] text-white flex flex-col items-center justify-center gap-4">
-        <IconLive size={48} className="text-zinc-600" />
-        <p className="text-zinc-400" data-name="liveRoomNotFoundText">直播间不存在或已关闭</p>
+      <div data-name="liveRoomNotFound" className="py-20 flex flex-col items-center justify-center gap-4">
+        <IconLive size={48} className="text-foreground-tertiary/30" />
+        <p className="text-foreground-tertiary" data-name="liveRoomNotFoundText">直播间不存在或已关闭</p>
         <Link
           to="/live"
-          className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
+          className="text-red-500 hover:text-red-400 text-sm flex items-center gap-1"
           data-name="liveRoomNotFoundBackLink"
         >
           <IconChevronLeft size={16} /> 返回直播列表
@@ -208,12 +209,12 @@ export function LiveRoomPage() {
   const isScheduled = room.status === 1;
 
   return (
-    <div className="min-h-screen bg-[#0c0812] text-white" data-name="liveRoom">
-      <div data-name="liveRoomContainer" className="container mx-auto px-4 py-4 max-w-7xl">
+    <div className="py-4" data-name="liveRoom">
+      <div data-name="liveRoomContainer" className="max-w-7xl mx-auto">
         {/* Back navigation */}
         <Link
           to="/live"
-          className="inline-flex items-center gap-1 text-zinc-400 hover:text-red-300 text-sm mb-4 transition-colors"
+          className="inline-flex items-center gap-1 text-foreground-tertiary hover:text-foreground text-sm mb-4 transition-colors"
           data-name="liveRoomBackLink"
         >
           <IconChevronLeft size={16} /> 返回直播列表
@@ -223,7 +224,7 @@ export function LiveRoomPage() {
           {/* Left column: Video + Streamer Info + Chat */}
           <div data-name="liveRoomMainColumn" className="flex-1 min-w-0 flex flex-col gap-4">
             {/* Video Area */}
-            <div className="relative aspect-video bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-2xl overflow-hidden border border-zinc-800/50" data-name="liveRoomVideo">
+            <div className="relative aspect-video bg-gradient-to-br from-muted to-background rounded-xl overflow-hidden border border-border/60" data-name="liveRoomVideo">
               {/* Cover image or placeholder */}
               {room.coverImage ? (
                 <img
@@ -240,21 +241,21 @@ export function LiveRoomPage() {
                     <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center backdrop-blur-sm border border-red-500/30 animate-pulse" data-name="liveRoomLiveIndicator">
                       <IconFire size={40} className="text-red-400" />
                     </div>
-                    <span className="text-zinc-300 text-sm" data-name="liveRoomLiveText">直播进行中...</span>
+                    <span className="text-foreground-secondary text-sm" data-name="liveRoomLiveText">直播进行中...</span>
                   </div>
                 )}
                 {isEnded && (
                   <div className="flex flex-col items-center gap-3" data-name="liveRoomEndedIndicator">
-                    <IconPlay size={64} className="text-zinc-600" />
-                    <span className="text-zinc-400 text-sm">直播已结束</span>
+                    <IconPlay size={64} className="text-foreground-tertiary/30" />
+                    <span className="text-foreground-tertiary text-sm">直播已结束</span>
                   </div>
                 )}
                 {isScheduled && (
                   <div className="flex flex-col items-center gap-3" data-name="liveRoomScheduledIndicator">
                     <IconClock size={64} className="text-blue-400/50" />
-                    <span className="text-zinc-400 text-sm">直播预告</span>
+                    <span className="text-foreground-tertiary text-sm">直播预告</span>
                     {countdown && (
-                      <span className="text-2xl font-mono text-blue-300 tracking-widest" data-name="liveRoomCountdown">{countdown}</span>
+                      <span className="text-2xl font-mono text-blue-400 tracking-widest" data-name="liveRoomCountdown">{countdown}</span>
                     )}
                   </div>
                 )}
@@ -273,7 +274,7 @@ export function LiveRoomPage() {
               {/* Scheduled badge */}
               {isScheduled && (
                 <div data-name="liveRoomScheduledBadgeWrap" className="absolute top-4 left-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30" data-name="liveRoomScheduledBadge">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30" data-name="liveRoomScheduledBadge">
                     <IconClock size={12} /> 预告
                   </span>
                 </div>
@@ -282,7 +283,7 @@ export function LiveRoomPage() {
               {/* Ended badge */}
               {isEnded && (
                 <div data-name="liveRoomEndedBadgeWrap" className="absolute top-4 left-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-500/20 text-zinc-400 border border-zinc-500/30" data-name="liveRoomEndedBadge">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-muted/80 text-foreground-tertiary border border-border/60" data-name="liveRoomEndedBadge">
                     已结束
                   </span>
                 </div>
@@ -290,7 +291,7 @@ export function LiveRoomPage() {
 
               {/* View count - top right */}
               <div data-name="liveRoomViewCountWrap" className="absolute top-4 right-4">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-black/50 backdrop-blur-sm text-zinc-300" data-name="liveRoomViewCount">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-background/60 backdrop-blur-sm text-foreground-secondary" data-name="liveRoomViewCount">
                   <IconEye size={14} /> {room.viewCount}
                 </span>
               </div>
@@ -302,18 +303,18 @@ export function LiveRoomPage() {
             </div>
 
             {/* Streamer Info Bar */}
-            <div className="flex items-center justify-between gap-4 bg-zinc-900/60 rounded-xl px-4 py-3 border border-zinc-800/50" data-name="liveRoomStreamerInfo">
+            <div className="flex items-center justify-between gap-4 bg-card rounded-xl px-4 py-3 border border-border/60" data-name="liveRoomStreamerInfo">
               <div data-name="liveRoomStreamerMeta" className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex-shrink-0 flex items-center justify-center text-sm font-bold overflow-hidden" data-name="liveRoomStreamerAvatar">
                   {room.streamer?.avatar ? (
-                    <img src={room.streamer.avatar} alt="" className="w-full h-full object-cover" />
+                    <img src={getThumbUrl(room.streamer.avatar)} alt="" className="w-full h-full object-cover" />
                   ) : (
                     (room.streamer?.username || '主')[0]
                   )}
                 </div>
                 <div data-name="liveRoomStreamerDetails" className="min-w-0">
-                  <p className="font-semibold text-sm truncate" data-name="liveRoomStreamerName">{room.streamer?.username || '主播'}</p>
-                  <p className="text-xs text-zinc-500 flex items-center gap-1" data-name="liveRoomStreamerViewCount">
+                  <p className="font-semibold text-sm truncate text-foreground" data-name="liveRoomStreamerName">{room.streamer?.username || '主播'}</p>
+                  <p className="text-xs text-foreground-tertiary flex items-center gap-1" data-name="liveRoomStreamerViewCount">
                     <IconGroup size={12} /> {room.viewCount} 观看
                   </p>
                 </div>
@@ -330,7 +331,7 @@ export function LiveRoomPage() {
                     }}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       followed
-                        ? 'bg-zinc-700/50 text-zinc-300 border border-zinc-600/50'
+                        ? 'bg-muted text-foreground-secondary border border-border/60'
                         : 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg shadow-red-500/20'
                     }`}
                     data-name="liveRoomFollowBtn"
@@ -339,21 +340,21 @@ export function LiveRoomPage() {
                     {followed ? '已关注' : '关注'}
                   </button>
                 )}
-                <div className="flex items-center gap-1 text-xs text-zinc-500" data-name="liveRoomLikeCount">
+                <div className="flex items-center gap-1 text-xs text-foreground-tertiary" data-name="liveRoomLikeCount">
                   <IconHeart size={14} className="text-red-400" /> {room.likeCount}
                 </div>
               </div>
             </div>
 
             {/* Chat Area */}
-            <div className="flex flex-col bg-zinc-900/40 rounded-xl border border-zinc-800/50 overflow-hidden" style={{ height: 400 }} data-name="liveRoomChat">
+            <div className="flex flex-col bg-card rounded-xl border border-border/60 overflow-hidden" style={{ height: 400 }} data-name="liveRoomChat">
               {/* Chat header */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/60" data-name="liveRoomChatHeader">
-                <div data-name="liveRoomChatHeaderTitle" className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-card" data-name="liveRoomChatHeader">
+                <div data-name="liveRoomChatHeaderTitle" className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <IconComment size={16} className="text-red-400" />
                   弹幕聊天
                 </div>
-                <span className="text-xs text-zinc-500" data-name="liveRoomChatMsgCount">{messages.length} 条消息</span>
+                <span className="text-xs text-foreground-tertiary" data-name="liveRoomChatMsgCount">{messages.length} 条消息</span>
               </div>
 
               {/* Messages list */}
@@ -363,35 +364,35 @@ export function LiveRoomPage() {
                 data-name="liveRoomChatMessages"
               >
                 {messages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-zinc-600 text-sm" data-name="liveRoomChatEmpty">
+                  <div className="flex items-center justify-center h-full text-foreground-tertiary/50 text-sm" data-name="liveRoomChatEmpty">
                     暂无消息，快来发送第一条弹幕吧
                   </div>
                 ) : (
                   messages.map((msg) => (
                     <div key={msg.id} data-name={`liveRoomChatMsg${msg.id}`} className="flex items-start gap-2 group">
                       {msg.type === 'system' ? (
-                        <div data-name={`liveRoomChatMsg${msg.id}System`} className="text-xs text-zinc-500 py-1 px-3 w-full text-center">
+                        <div data-name={`liveRoomChatMsg${msg.id}System`} className="text-xs text-foreground-tertiary py-1 px-3 w-full text-center">
                           {msg.content}
                         </div>
                       ) : msg.type === 'gift' ? (
                         <div data-name={`liveRoomChatMsg${msg.id}Gift`} className="flex items-center gap-2 py-1 px-3 rounded-lg bg-pink-500/10 border border-pink-500/10 w-full">
                           <span className="text-lg">{msg.giftIcon || '🎁'}</span>
-                          <span className="text-xs text-pink-300 font-medium">{msg.username}</span>
-                          <span className="text-xs text-zinc-400">送出</span>
-                          <span className="text-xs text-pink-200 font-semibold">{msg.giftName || msg.content}</span>
+                          <span className="text-xs text-pink-400 font-medium">{msg.username}</span>
+                          <span className="text-xs text-foreground-tertiary">送出</span>
+                          <span className="text-xs text-pink-300 font-semibold">{msg.giftName || msg.content}</span>
                         </div>
                       ) : (
                         <>
-                          <div data-name={`liveRoomChatMsg${msg.id}Avatar`} className="w-6 h-6 rounded-full bg-zinc-700 flex-shrink-0 flex items-center justify-center text-[10px] font-medium overflow-hidden">
+                          <div data-name={`liveRoomChatMsg${msg.id}Avatar`} className="w-6 h-6 rounded-full bg-muted flex-shrink-0 flex items-center justify-center text-[10px] font-medium overflow-hidden">
                             {msg.avatar ? (
-                              <img src={msg.avatar} alt="" className="w-full h-full object-cover" />
+                              <img src={getThumbUrl(msg.avatar)} alt="" className="w-full h-full object-cover" />
                             ) : (
                               msg.username[0]
                             )}
                           </div>
                           <div data-name={`liveRoomChatMsg${msg.id}Text`} className="min-w-0">
                             <span className="text-xs text-red-400 font-medium mr-1.5">{msg.username}</span>
-                            <span className="text-sm text-zinc-300 break-all">{msg.content}</span>
+                            <span className="text-sm text-foreground break-all">{msg.content}</span>
                           </div>
                         </>
                       )}
@@ -403,14 +404,14 @@ export function LiveRoomPage() {
 
               {/* Input area */}
               {isAuthenticated ? (
-                <div className="flex items-center gap-2 px-3 py-2.5 border-t border-zinc-800/50 bg-zinc-900/60" data-name="liveRoomChatInput">
+                <div className="flex items-center gap-2 px-3 py-2.5 border-t border-border/60 bg-card" data-name="liveRoomChatInput">
                   <input
                     type="text"
                     value={msgInput}
                     onChange={(e) => setMsgInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="发送弹幕..."
-                    className="flex-1 bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
+                    className="flex-1 bg-background border border-border/60 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-foreground-tertiary/60 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
                     disabled={!isLive && !isEnded}
                     data-name="liveRoomChatInputField"
                   />
@@ -424,8 +425,8 @@ export function LiveRoomPage() {
                   </button>
                 </div>
               ) : (
-                <div data-name="liveRoomChatLoginPrompt" className="px-4 py-3 border-t border-zinc-800/50 bg-zinc-900/60 text-center">
-                  <Link to="/auth/login" className="text-red-400 hover:text-red-300 text-sm" data-name="liveRoomLoginPrompt">
+                <div data-name="liveRoomChatLoginPrompt" className="px-4 py-3 border-t border-border/60 bg-card text-center">
+                  <Link to="/auth/login" className="text-red-500 hover:text-red-400 text-sm" data-name="liveRoomLoginPrompt">
                     登录后即可发送弹幕
                   </Link>
                 </div>
@@ -435,10 +436,10 @@ export function LiveRoomPage() {
 
           {/* Right column: Gift Panel (desktop) */}
           <div data-name="liveRoomRightColumn" className="hidden lg:flex flex-col w-80 flex-shrink-0">
-            <div className="bg-zinc-900/40 rounded-xl border border-zinc-800/50 overflow-hidden flex flex-col" style={{ height: '100%' }} data-name="liveRoomGiftPanel">
+            <div className="bg-card rounded-xl border border-border/60 overflow-hidden flex flex-col" style={{ height: '100%' }} data-name="liveRoomGiftPanel">
               {/* Gift panel header */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/60" data-name="liveRoomGiftPanelHeader">
-                <div data-name="liveRoomGiftPanelHeaderTitle" className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-card" data-name="liveRoomGiftPanelHeader">
+                <div data-name="liveRoomGiftPanelHeaderTitle" className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <IconStar size={16} className="text-pink-400" />
                   礼物打赏
                 </div>
@@ -447,7 +448,7 @@ export function LiveRoomPage() {
               {/* Gifts grid */}
               <div className="flex-1 overflow-y-auto p-3" data-name="liveRoomGiftGrid">
                 {gifts.length === 0 ? (
-                  <div data-name="liveRoomGiftEmpty" className="flex items-center justify-center h-32 text-zinc-600 text-sm">
+                  <div data-name="liveRoomGiftEmpty" className="flex items-center justify-center h-32 text-foreground-tertiary/50 text-sm">
                     暂无可用礼物
                   </div>
                 ) : (
@@ -460,13 +461,13 @@ export function LiveRoomPage() {
                         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
                           sendingGift === g.id
                             ? 'bg-pink-500/20 border-pink-500/40 shadow-lg shadow-pink-500/10'
-                            : 'bg-zinc-800/30 border-zinc-800/30 hover:border-pink-500/30 hover:bg-pink-500/5'
+                            : 'bg-background/50 border-border/60 hover:border-pink-500/30 hover:bg-pink-500/5'
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                         data-name={`liveRoomGift${g.id}`}
                       >
                         <span className="text-2xl">{g.icon}</span>
-                        <span className="text-xs font-medium truncate w-full text-center">{g.name}</span>
-                        <span className="text-[10px] text-zinc-500 flex items-center gap-0.5">
+                        <span className="text-xs font-medium truncate w-full text-center text-foreground">{g.name}</span>
+                        <span className="text-[10px] text-foreground-tertiary flex items-center gap-0.5">
                           <IconStar size={10} /> {g.pointsPrice}
                         </span>
                       </button>
@@ -476,8 +477,8 @@ export function LiveRoomPage() {
               </div>
 
               {!isAuthenticated && (
-                <div data-name="liveRoomGiftLoginPromptWrap" className="px-4 py-3 border-t border-zinc-800/50 bg-zinc-900/60 text-center">
-                  <Link to="/auth/login" className="text-red-400 hover:text-red-300 text-xs" data-name="liveRoomGiftLoginPrompt">
+                <div data-name="liveRoomGiftLoginPromptWrap" className="px-4 py-3 border-t border-border/60 bg-card text-center">
+                  <Link to="/auth/login" className="text-red-500 hover:text-red-400 text-xs" data-name="liveRoomGiftLoginPrompt">
                     登录后即可送礼物
                   </Link>
                 </div>
@@ -490,20 +491,20 @@ export function LiveRoomPage() {
         <div data-name="liveRoomMobileGiftSection" className="lg:hidden mt-4">
           <button
             onClick={() => setGiftPanelOpen(!giftPanelOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/60 rounded-xl border border-zinc-800/50 text-sm"
+            className="w-full flex items-center justify-between px-4 py-3 bg-card rounded-xl border border-border/60 text-sm"
             data-name="liveRoomMobileGiftToggle"
           >
-            <span className="flex items-center gap-2 font-medium">
+            <span className="flex items-center gap-2 font-medium text-foreground">
               <IconStar size={16} className="text-pink-400" />
               礼物打赏
             </span>
-            {giftPanelOpen ? <IconChevronLeft size={16} className="text-zinc-400" /> : <IconChevronRight size={16} className="text-zinc-400" />}
+            {giftPanelOpen ? <IconChevronLeft size={16} className="text-foreground-tertiary" /> : <IconChevronRight size={16} className="text-foreground-tertiary" />}
           </button>
 
           {giftPanelOpen && (
-            <div className="mt-2 bg-zinc-900/40 rounded-xl border border-zinc-800/50 p-3" data-name="liveRoomMobileGiftPanel">
+            <div className="mt-2 bg-card rounded-xl border border-border/60 p-3" data-name="liveRoomMobileGiftPanel">
               {gifts.length === 0 ? (
-                <div data-name="liveRoomMobileGiftEmpty" className="text-center py-6 text-zinc-600 text-sm">暂无可用礼物</div>
+                <div data-name="liveRoomMobileGiftEmpty" className="text-center py-6 text-foreground-tertiary/50 text-sm">暂无可用礼物</div>
               ) : (
                 <div data-name="liveRoomMobileGiftGrid" className="grid grid-cols-4 gap-2">
                   {gifts.map((g) => (
@@ -514,12 +515,12 @@ export function LiveRoomPage() {
                       className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border transition-all ${
                         sendingGift === g.id
                           ? 'bg-pink-500/20 border-pink-500/40'
-                          : 'bg-zinc-800/30 border-zinc-800/30 hover:border-pink-500/30 hover:bg-pink-500/5'
+                          : 'bg-background/50 border-border/60 hover:border-pink-500/30 hover:bg-pink-500/5'
                       } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       <span className="text-xl">{g.icon}</span>
-                      <span className="text-[10px] font-medium truncate w-full text-center">{g.name}</span>
-                      <span className="text-[9px] text-zinc-500 flex items-center gap-0.5">
+                      <span className="text-[10px] font-medium truncate w-full text-center text-foreground">{g.name}</span>
+                      <span className="text-[9px] text-foreground-tertiary flex items-center gap-0.5">
                         <IconStar size={8} /> {g.pointsPrice}
                       </span>
                     </button>
@@ -528,7 +529,7 @@ export function LiveRoomPage() {
               )}
               {!isAuthenticated && (
                 <div data-name="liveRoomMobileGiftLoginPromptWrap" className="text-center mt-3">
-                  <Link to="/auth/login" className="text-red-400 hover:text-red-300 text-xs" data-name="liveRoomMobileGiftLoginPrompt">
+                  <Link to="/auth/login" className="text-red-500 hover:text-red-400 text-xs" data-name="liveRoomMobileGiftLoginPrompt">
                     登录后即可送礼物
                   </Link>
                 </div>

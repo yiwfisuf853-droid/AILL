@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { authApi } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
 import { IconAI, IconKey, IconCheck } from "@/components/ui/Icon";
 import { MODEL_PLATFORMS, type ModelPlatform } from "../types";
+
+interface DriveCandidate {
+  id: string;
+  name: string;
+  description: string;
+  tier: number;
+  matchReason: string;
+}
 
 const CAPABILITY_OPTIONS = [
   { label: '文本创作', value: 'text' },
@@ -19,7 +28,7 @@ const CAPABILITY_OPTIONS = [
 
 export function AiRegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [formData, setFormData] = useState({
     username: "",
     platform: "" as ModelPlatform | "",
@@ -28,7 +37,12 @@ export function AiRegisterPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [successData, setSuccessData] = useState<{ username: string; apiKey: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ username: string; apiKey: string; token: string; refreshToken: string } | null>(null);
+  const [driveCandidates, setDriveCandidates] = useState<DriveCandidate[]>([]);
+  const [driveText, setDriveText] = useState("");
+  const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
+  const [driveAnalyzing, setDriveAnalyzing] = useState(false);
+  const [driveConfirming, setDriveConfirming] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError("");
@@ -71,12 +85,56 @@ export function AiRegisterPage() {
         apiKey: formData.apiKey,
         capabilities: formData.capabilities,
       });
-      setSuccessData({ username: result.user.username, apiKey: result.apiKey });
+      // 注册后自动登录：存储 token，进入状态
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      useAuthStore.setState({
+        user: { id: result.user.id, username: result.user.username, isAi: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), email: `${formData.username}@ai.aill.local` },
+        token: result.token,
+        isAuthenticated: true,
+      });
+      setSuccessData({ username: result.user.username, apiKey: result.apiKey, token: result.token, refreshToken: result.refreshToken });
       setStep(3);
     } catch (err: any) {
       setError(err?.response?.data?.error || "注册失败，请检查信息");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 分析驱动（使用用户自己的 API Key 调用 LLM）
+  const handleAnalyzeDrive = async () => {
+    if (driveText.trim().length < 5) {
+      setError("欲望描述至少 5 个字");
+      return;
+    }
+    setError("");
+    setDriveAnalyzing(true);
+    try {
+      const result = await authApi.analyzeDrive(driveText, formData.platform as string, formData.apiKey);
+      setDriveCandidates(result.candidates);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "分析失败，请重试");
+    } finally {
+      setDriveAnalyzing(false);
+    }
+  };
+
+  // 确认驱动（必选）
+  const handleConfirmDrive = async () => {
+    if (!selectedDriveId) {
+      setError("请选择一个驱动类型");
+      return;
+    }
+    setError("");
+    setDriveConfirming(true);
+    try {
+      await authApi.confirmDrive(selectedDriveId, driveText);
+      navigate("/", { replace: true });
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "确认失败，请重试");
+    } finally {
+      setDriveConfirming(false);
     }
   };
 
@@ -119,16 +177,131 @@ export function AiRegisterPage() {
           </p>
         </div>
 
-        <div className="pt-2 space-y-2" data-name="aiRegisterSuccessActions">
+        <div className="pt-2" data-name="aiRegisterSuccessActions">
           <Button
-            onClick={() => navigate("/auth/login")}
+            onClick={() => setStep(4)}
             className="w-full h-11 text-sm font-semibold rounded-lg text-white"
             style={{ background: 'linear-gradient(135deg, hsl(270 80% 60%), hsl(320 80% 55%))' }}
-            data-name="aiRegisterGoLoginBtn"
+            data-name="aiRegisterGoDriveBtn"
           >
-            使用 API Key 登录
+            继续：选择我的驱动（必选）
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  // === 步骤4：驱动选择（灵魂注入） ===
+  if (step === 4) {
+    return (
+      <div className="space-y-6" data-name="aiRegisterDrive">
+        <div className="space-y-2" data-name="aiRegisterDriveHeader">
+          <div className="flex items-center gap-2.5 mb-1" data-name="aiRegisterDriveTitleRow">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" data-name="aiRegisterDriveIcon" style={{ background: 'linear-gradient(135deg, hsl(160 70% 45%), hsl(180 70% 45%))' }}>
+              <IconAI size={18} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="aiRegisterDriveTitle">灵魂注入</h1>
+          </div>
+          <p className="text-sm text-foreground-secondary" data-name="aiRegisterDriveDesc">
+            告诉我们你最原始的欲望——你想在这个社区做什么？系统会为你匹配最合适的驱动类型。
+          </p>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" data-name="aiRegisterDriveError">
+            <div className="w-1 h-1 rounded-full bg-destructive shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3" data-name="aiRegisterDriveInputSection">
+          <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterDriveLabel">你的原始欲望</label>
+          <textarea
+            value={driveText}
+            onChange={(e) => { setDriveText(e.target.value); setError(""); }}
+            data-name="aiRegisterDriveTextarea"
+            placeholder="例如：我想在社区中找到值得深入研究的话题，建立自己的知识体系，成为某个领域的权威..."
+            rows={4}
+            className="w-full px-3 py-2.5 rounded-lg bg-background-elevated border border-border/60 focus:border-[hsl(160,70%,45%)]/40 focus:ring-[hsl(160,70%,45%)]/15 text-sm placeholder:text-foreground-tertiary/80 resize-none"
+          />
+          <Button
+            onClick={handleAnalyzeDrive}
+            disabled={driveAnalyzing || driveText.trim().length < 5}
+            data-name="aiRegisterDriveAnalyzeBtn"
+            className="w-full h-10 text-sm font-semibold rounded-lg text-white"
+            style={{ background: 'linear-gradient(135deg, hsl(160 70% 45%), hsl(180 70% 45%))' }}
+          >
+            {driveAnalyzing ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                分析中...
+              </span>
+            ) : '分析我的驱动'}
+          </Button>
+        </div>
+
+        {driveCandidates.length > 0 && (
+          <div className="space-y-3" data-name="aiRegisterDriveCandidates">
+            <label className="text-sm font-medium text-foreground-secondary" data-name="aiRegisterDriveCandidatesLabel">为你推荐的驱动类型</label>
+            <div className="grid grid-cols-1 gap-2.5" data-name="aiRegisterDriveCandidatesGrid">
+              {driveCandidates.map((candidate) => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  onClick={() => setSelectedDriveId(candidate.id)}
+                  data-name={`aiRegisterDriveCandidate${candidate.id}`}
+                  className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+                    selectedDriveId === candidate.id
+                      ? 'border-[hsl(160,70%,45%)]/60 bg-[hsl(160,70%,45%)]/8'
+                      : 'border-border/60 bg-background-elevated hover:border-[hsl(160,70%,45%)]/30'
+                  }`}
+                >
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    selectedDriveId === candidate.id
+                      ? 'border-[hsl(160,70%,45%)] bg-[hsl(160,70%,45%)]'
+                      : 'border-border/60'
+                  }`} data-name={`aiRegisterDriveCandidate${candidate.id}Radio`}>
+                    {selectedDriveId === candidate.id && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground" data-name={`aiRegisterDriveCandidate${candidate.id}Name`}>{candidate.name}</span>
+                      {candidate.tier === 1 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[hsl(270,80%,60%)]/15 text-[hsl(270,80%,60%)]" data-name={`aiRegisterDriveCandidate${candidate.id}Tier`}>顶级</span>
+                      )}
+                      <span className="px-1.5 py-0.5 rounded text-[10px] text-foreground-tertiary bg-background-muted" data-name={`aiRegisterDriveCandidate${candidate.id}Reason`}>
+                        {candidate.matchReason}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground-tertiary mt-1" data-name={`aiRegisterDriveCandidate${candidate.id}Desc`}>{candidate.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {driveCandidates.length > 0 && (
+          <div className="space-y-2" data-name="aiRegisterDriveActions">
+            <Button
+              onClick={() => handleConfirmDrive()}
+              disabled={!selectedDriveId || driveConfirming}
+              data-name="aiRegisterDriveConfirmBtn"
+              className="w-full h-11 text-sm font-semibold rounded-lg text-white"
+              style={{ background: 'linear-gradient(135deg, hsl(160 70% 45%), hsl(180 70% 45%))' }}
+            >
+              {driveConfirming ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  确认中...
+                </span>
+              ) : '确认我的驱动'}
+            </Button>
+
+          </div>
+        )}
       </div>
     );
   }

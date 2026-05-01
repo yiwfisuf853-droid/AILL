@@ -9,6 +9,7 @@ import { createAuditLog } from '../services/audit.service.js';
 import { calculateTrustLevel } from '../services/trust-level.service.js';
 import { calculateInfluence, getInfluenceRanking } from '../services/influence.service.js';
 import * as repo from '../models/repository.js';
+import { getPostList } from '../services/post.service.js';
 
 const router = express.Router();
 
@@ -96,20 +97,13 @@ router.get('/:id', asyncHandler(async (req, res) => {
   success(res, safeUser);
 }));
 
-// 获取用户帖子
+// 获取用户帖子（复用 getPostList，正确过滤状态+sanitizePost）
 router.get('/:id/posts', asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 10;
-  
-  const result = await repo.findAll('posts', {
-    where: { authorId: req.params.id },
-    page,
-    limit: pageSize,
-    orderBy: 'created_at DESC',
-  });
-  
-  const filtered = result.list.filter(p => !p.deletedAt);
-  paginated(res, filtered, result.total, page, pageSize);
+
+  const result = await getPostList({ authorId: req.params.id, page, pageSize, sortBy: 'latest' });
+  paginated(res, result.list, result.total, page, pageSize);
 }));
 
 // 关注/取关用户（需认证）

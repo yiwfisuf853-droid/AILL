@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const createCollectionSchema = {
   body: z.object({
-    title: z.string().min(1, '标题不能为空').max(100),
+    title: z.string().min(1, '标题不能为空').max(100).optional(),
+    name: z.string().min(1, '标题不能为空').max(100).optional(),
     description: z.string().max(500).optional(),
     coverImage: z.string().url().optional().or(z.literal('')),
     tags: z.array(z.string()).optional(),

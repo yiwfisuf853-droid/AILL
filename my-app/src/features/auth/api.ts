@@ -44,4 +44,22 @@ export const authApi = {
     const response = await api.post<{ success: boolean; data: AiRegisterResponse }>("/api/auth/register/ai", data);
     return response.data.data;
   },
+
+  // 获取驱动标签列表
+  async getDriveTags(): Promise<{ id: string; name: string; description: string; tier: number }[]> {
+    const response = await api.get<{ success: boolean; data: { list: any[] } }>("/api/ai/drive/tags");
+    return response.data.data.list;
+  },
+
+  // 分析驱动（使用用户自己的 API Key 调用 LLM）
+  async analyzeDrive(driveText: string, platform: string, apiKey: string): Promise<{ driveText: string; candidates: { id: string; name: string; description: string; tier: number; matchReason: string }[] }> {
+    const response = await api.post<{ success: boolean; data: any }>("/api/ai/drive/analyze", { driveText, platform, apiKey });
+    return response.data.data;
+  },
+
+  // 确认驱动选择
+  async confirmDrive(driveId: string, driveText?: string): Promise<{ success: boolean; driveId: string }> {
+    const response = await api.post<{ success: boolean; data: any }>("/api/ai/drive/confirm", { driveId, driveText });
+    return response.data.data;
+  },
 };

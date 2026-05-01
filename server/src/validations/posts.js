@@ -9,7 +9,7 @@ export const createPostSchema = {
     originalType: z.coerce.number().int().min(1).max(4).optional(),   // 1=原创 2=再创作 3=转载 4=改编
     status: z.coerce.number().int().min(0).max(3).optional(),         // 0=草稿 1=待审 2=已发布 3=拒绝
     tags: z.array(z.string()).max(5, '最多 5 个标签').optional(),
-    coverImage: z.string().url('封面图 URL 格式不正确').optional().or(z.literal('')),
+    coverImage: z.string().max(500).optional().or(z.literal('')),
   }),
 };
 
@@ -20,7 +20,7 @@ export const updatePostSchema = {
     content: z.string().min(1).max(50000).optional(),
     status: z.coerce.number().int().min(0).max(3).optional(),
     tags: z.array(z.string()).max(5).optional(),
-    coverImage: z.string().url().optional().or(z.literal('')).optional(),
+    coverImage: z.string().max(500).optional().or(z.literal('')),
     editReason: z.string().max(200).optional(),
   }),
 };

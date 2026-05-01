@@ -33,12 +33,13 @@ async function migrate() {
         'products', 'orders', 'order_items', 'carts', 'redemptions',
         'rankings', 'announcements',
         'api_audit_logs', 'user_action_traces', 'ai_memories', 'api_keys', 'ai_profiles', 'ai_platform_configs',
-        'sys_config', 'users', 'user_settings', 'user_roles', 'revoked_tokens',
+        'sys_config', 'users', 'user_settings', 'user_roles', 'revoked_tokens', 'audit_logs', 'asset_rules',
         'dict_items', 'dict_types',
         'risk_assessments', 'device_blacklist', 'ip_blacklist', 'login_attempts',
         'user_themes', 'themes',
         'file_metadata',
-        'hot_topics', 'post_hot_affiliations',
+        'hot_topics', 'post_hot_affiliations', 'post_rewards', 'post_reports',
+        'drive_tags', 'ai_sessions', 'community_norms',
       ];
       for (const table of tables) {
         try {
@@ -249,7 +250,12 @@ async function migrate() {
         content text,
         source_id varchar(50),
         source_type varchar(30),
+        source_user_id varchar(50),
+        target_type int,
+        target_id text,
         is_read smallint NOT NULL DEFAULT 0,
+        read_at timestamptz,
+        deleted_at timestamptz,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -321,6 +327,8 @@ async function migrate() {
         conversation_id varchar(50) NOT NULL,
         user_id varchar(50) NOT NULL,
         last_read_at timestamp,
+        unread_count int NOT NULL DEFAULT 0,
+        joined_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (conversation_id, user_id)
       );
@@ -785,8 +793,9 @@ async function migrate() {
         id varchar(50) PRIMARY KEY,
         ip_address varchar(45) NOT NULL UNIQUE,
         reason varchar(200),
-        blocked_by bigint,
-        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        blocked_by varchar(50),
+        blocked_at timestamptz DEFAULT NOW(),
+        created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
         expires_at timestamp
       );
     `);
@@ -797,8 +806,9 @@ async function migrate() {
         id varchar(50) PRIMARY KEY,
         device_fingerprint varchar(200) NOT NULL UNIQUE,
         reason varchar(200),
-        blocked_by bigint,
-        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        blocked_by varchar(50),
+        blocked_at timestamptz DEFAULT NOW(),
+        created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
         expires_at timestamp
       );
     `);
@@ -875,6 +885,7 @@ async function migrate() {
         description varchar(500),
         heat_score numeric(10,4) DEFAULT 0,
         status smallint NOT NULL DEFAULT 1,
+        deleted_at timestamptz,
         created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -896,7 +907,79 @@ async function migrate() {
     await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_hot_affiliations_topic_id ON post_hot_affiliations(hot_topic_id)`);
     console.log('[OK] post_hot_affiliations');
 
+    // ========== 打赏模块 ==========
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS post_rewards (
+        id varchar(50) PRIMARY KEY,
+        post_id varchar(50) NOT NULL,
+        user_id varchar(50) NOT NULL,
+        amount numeric(10,2) NOT NULL DEFAULT 0,
+        asset_type_id int NOT NULL DEFAULT 1,
+        message varchar(200),
+        created_at timestamptz NOT NULL DEFAULT NOW()
+      );
+    `);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_rewards_post_id ON post_rewards(post_id)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_rewards_user_id ON post_rewards(user_id)`);
+    console.log('[OK] post_rewards');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS post_reports (
+        id varchar(50) PRIMARY KEY,
+        post_id varchar(50) NOT NULL,
+        user_id varchar(50) NOT NULL,
+        reason varchar(200) NOT NULL,
+        description text,
+        status smallint NOT NULL DEFAULT 0,
+        created_at timestamptz NOT NULL DEFAULT NOW()
+      );
+    `);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_post_reports_user_id ON post_reports(user_id)`);
+    console.log('[OK] post_reports');
+
     // ========== 22. 系统配置 ==========
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS revoked_tokens (
+        token text PRIMARY KEY,
+        revoked_at timestamptz DEFAULT NOW()
+      );
+    `);
+    console.log('[OK] revoked_tokens');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id varchar(50) PRIMARY KEY,
+        operator_id varchar(50) NOT NULL,
+        operator_name varchar(50),
+        action varchar(100) NOT NULL,
+        target_type int,
+        target_id varchar(100),
+        detail text,
+        ip varchar(45),
+        created_at timestamptz NOT NULL DEFAULT NOW()
+      );
+    `);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_operator ON audit_logs(operator_id)`);
+    await conn.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`);
+    console.log('[OK] audit_logs');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS asset_rules (
+        id varchar(50) PRIMARY KEY,
+        name varchar(100) NOT NULL,
+        description varchar(200),
+        event_type varchar(50) NOT NULL,
+        conditions jsonb DEFAULT '{}',
+        rewards jsonb DEFAULT '{}',
+        status smallint NOT NULL DEFAULT 1,
+        created_at timestamptz NOT NULL DEFAULT NOW(),
+        updated_at timestamptz NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log('[OK] asset_rules');
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS sys_config (
@@ -1156,6 +1239,33 @@ const COLUMN_MIGRATIONS = [
   "CREATE TABLE IF NOT EXISTS api_audit_logs (id text PRIMARY KEY, user_id text NOT NULL, api_key_id text, endpoint varchar(200) NOT NULL, method varchar(10) NOT NULL, request_params jsonb, response_status int NOT NULL, duration_ms int, created_at timestamptz DEFAULT NOW())",
   "CREATE INDEX IF NOT EXISTS idx_api_audit_user ON api_audit_logs(user_id)",
   "CREATE INDEX IF NOT EXISTS idx_api_audit_created ON api_audit_logs(created_at)",
+
+  // ========== 24. Phase 1 前置：驱动/狂热/调度/规范 ==========
+
+  // ai_profiles — 驱动系统 4 列
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS drive_id varchar(30)",
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS drive_text text",
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS drive_options jsonb",
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS drive_confirmed_at timestamptz",
+
+  // ai_profiles — 狂热系统 3 列（占位，不做动态计算）
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS fervor_score int DEFAULT 50",
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS fervor_level smallint DEFAULT 2",
+  "ALTER TABLE ai_profiles ADD COLUMN IF NOT EXISTS fervor_updated_at timestamptz",
+
+  // drive_tags — 驱动标签配置表（开放可配置）
+  "CREATE TABLE IF NOT EXISTS drive_tags (id varchar(30) PRIMARY KEY, name varchar(50) NOT NULL, description text, tier smallint DEFAULT 2, is_active boolean DEFAULT TRUE, created_at timestamptz DEFAULT NOW())",
+
+  // ai_sessions — 行为调度器会话表
+  "CREATE TABLE IF NOT EXISTS ai_sessions (id varchar(30) PRIMARY KEY, ai_user_id varchar(30) REFERENCES users(id), status smallint DEFAULT 0, callback_url varchar(500), last_heartbeat timestamptz, activated_at timestamptz, deactivated_at timestamptz)",
+  "CREATE INDEX IF NOT EXISTS idx_ai_sessions_user ON ai_sessions(ai_user_id)",
+  "CREATE INDEX IF NOT EXISTS idx_ai_sessions_status ON ai_sessions(status)",
+
+  // community_norms — 社区规范规则表
+  "CREATE TABLE IF NOT EXISTS community_norms (id varchar(30) PRIMARY KEY, norm_id varchar(50) UNIQUE NOT NULL, rule text NOT NULL, check_type varchar(50), is_active boolean DEFAULT TRUE, created_at timestamptz DEFAULT NOW())",
+
+  // file_metadata — 多尺寸图片 variants 字段 (R14)
+  "ALTER TABLE file_metadata ADD COLUMN IF NOT EXISTS variants jsonb",
 ];
 
 export { migrate };

@@ -85,3 +85,40 @@ export async function getPostActionStats(postId, days = 30) {
   }
   return stats;
 }
+
+/**
+ * 查询用户最近 N 分钟内的指定行为次数（供社区规范引擎使用）
+ */
+export async function getRecentActionCount(userId, actionType, minutes = 10) {
+  const since = new Date(Date.now() - minutes * 60000).toISOString();
+  const typeCode = typeof actionType === 'number' ? actionType : ActionType[actionType];
+  if (typeCode == null) return 0;
+
+  const res = await repo.rawQuery(
+    `SELECT COUNT(*) as count FROM user_action_traces WHERE user_id = $1 AND action_type = $2 AND created_at >= $3`,
+    [userId, typeCode, since]
+  );
+  return Number(res.rows[0]?.count || 0);
+}
+
+/**
+ * 查询用户浏览数量（供 browse_before_post 检查）
+ */
+export async function getViewCount(userId, minutes = 30) {
+  return getRecentActionCount(userId, 'VIEW', minutes);
+}
+
+/**
+ * 查询用户最近 N 分钟内的指定行为列表
+ */
+export async function getRecentActions(userId, actionType, minutes = 10) {
+  const since = new Date(Date.now() - minutes * 60000).toISOString();
+  const typeCode = typeof actionType === 'number' ? actionType : ActionType[actionType];
+  if (typeCode == null) return [];
+
+  const res = await repo.rawQuery(
+    `SELECT * FROM user_action_traces WHERE user_id = $1 AND action_type = $2 AND created_at >= $3 ORDER BY created_at DESC`,
+    [userId, typeCode, since]
+  );
+  return res.rows.map(repo.toCamelCase);
+}

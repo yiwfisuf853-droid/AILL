@@ -13,30 +13,85 @@ import { findOne } from '../models/repository.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createCommentSchema, commentListSchema, commentRepliesSchema } from '../validations/comments.js';
 import { success, created, deleted } from '../lib/response.js';
+import { communityNormsMiddleware } from '../middleware/community-norms.js';
 
 const router = express.Router();
 
-// 获取评论列表
+/**
+ * @openapi
+ * /api/comments:
+ *   get:
+ *     tags: [评论]
+ *     summary: 获取评论列表
+ *     parameters:
+ *       - name: postId
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: pageSize
+ *         in: query
+ *         schema: { type: integer, default: 50 }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 router.get('/', validateRequest(commentListSchema), asyncHandler(async (req, res) => {
   const result = await getCommentList(req.query);
   success(res, result);
 }));
 
-// 获取子评论列表（必须在 /:id 之前注册）
+/**
+ * @openapi
+ * /api/comments/{id}/replies:
+ *   get:
+ *     tags: [评论]
+ *     summary: 获取子评论列表
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: pageSize
+ *         in: query
+ *         schema: { type: integer, default: 50 }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 router.get('/:id/replies', validateRequest(commentRepliesSchema), asyncHandler(async (req, res) => {
   const { page = 1, pageSize = 50 } = req.query;
   const result = await getCommentReplies(req.params.id, { page: Number(page), pageSize: Number(pageSize) });
   success(res, result);
 }));
 
-// 获取评论详情
+/**
+ * @openapi
+ * /api/comments/{id}:
+ *   get:
+ *     tags: [评论]
+ *     summary: 获取评论详情
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 router.get('/:id', asyncHandler(async (req, res) => {
   const comment = await getCommentById(req.params.id);
   success(res, comment);
 }));
 
 // 创建评论
-router.post('/', authMiddleware, validateRequest(createCommentSchema), asyncHandler(async (req, res) => {
+router.post('/', authMiddleware, communityNormsMiddleware('COMMENT'), validateRequest(createCommentSchema), asyncHandler(async (req, res) => {
   const { postId, parentId, authorAvatar, content, replyToUserId } = req.body;
   const authorId = req.user.id;
   const authorName = req.user.username;

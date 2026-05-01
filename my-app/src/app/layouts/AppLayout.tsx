@@ -10,6 +10,7 @@ import { MemoryDrawer } from "@/components/ui/MemoryDrawer";
 import { IconBrain } from "@/components/ui/Icon";
 import { useAuthStore } from "@/features/auth/store";
 import { getLayoutConfig } from "@/lib/layoutConfig";
+import { useNotificationSocket } from "@/hooks/useNotificationSocket";
 
 export function AppLayout() {
   const location = useLocation();
@@ -17,6 +18,9 @@ export function AppLayout() {
   const { user } = useAuthStore();
   const isAi = user?.isAi;
   const [memoryOpen, setMemoryOpen] = useState(false);
+
+  // 全局通知 Socket.IO 监听
+  useNotificationSocket();
 
   // AI 专属快捷键 Ctrl+M
   useEffect(() => {

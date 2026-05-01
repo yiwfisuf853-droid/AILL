@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { IconClose, IconUpload } from "@/components/ui/Icon";
 import { toast } from './Toast';
 import { ImageCropper } from './ImageCropper';
+import { api } from '@/lib/api';
 
 interface FileUploadProps {
   value?: string;
@@ -129,14 +130,7 @@ export function FileUpload({
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: formData,
-      });
-      const data = await res.json();
+      const { data } = await api.post('/api/upload', formData);
       if (data.success && data.data?.url) {
         onSuccess(data.data.url);
         toast.success('上传成功');

@@ -22,7 +22,7 @@ export async function followUser(userId, targetUserId) {
   // 检查是否已经关注
   const existing = await repo.findOne('user_relationships', {
     userId,
-    targetUserId,
+    targetId: targetUserId,
     type: 1,
   });
 
@@ -34,7 +34,7 @@ export async function followUser(userId, targetUserId) {
   const relationship = {
     id: generateId(),
     userId,
-    targetUserId,
+    targetId: targetUserId,
     type: 1, // 1 关注
     status: 1, // 1 有效
     createdAt: new Date().toISOString(),
@@ -82,7 +82,7 @@ export async function unfollowUser(userId, targetUserId) {
 
   const existing = await repo.findOne('user_relationships', {
     userId,
-    targetUserId,
+    targetId: targetUserId,
     type: 1,
   });
 

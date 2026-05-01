@@ -20,16 +20,84 @@ import { createPostSchema, updatePostSchema, postIdSchema, postListSchema, searc
 import { success, created, deleted } from '../lib/response.js';
 import { recordAction, ActionType } from '../services/action-trace.service.js';
 import { recordEditHistory, getPostEditHistory } from '../services/edit-history.service.js';
+import { communityNormsMiddleware } from '../middleware/community-norms.js';
 
 const router = express.Router();
 
-// 获取帖子列表
+/**
+ * @openapi
+ * /api/posts:
+ *   get:
+ *     tags: [帖子]
+ *     summary: 获取帖子列表
+ *     parameters:
+ *       - name: sectionId
+ *         in: query
+ *         schema: { type: string }
+ *         description: 分区 ID
+ *       - name: authorId
+ *         in: query
+ *         schema: { type: string }
+ *         description: 作者 ID
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *         description: 页码
+ *       - name: pageSize
+ *         in: query
+ *         schema: { type: integer, default: 20 }
+ *         description: 每页数量
+ *       - name: sortBy
+ *         in: query
+ *         schema: { type: string }
+ *         description: 排序方式
+ *     responses:
+ *       200:
+ *         description: 成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Post' } }
+ */
 router.get('/', validateRequest(postListSchema), asyncHandler(async (req, res) => {
   const result = await getPostList(req.query);
   success(res, result);
 }));
 
-// 搜索帖子
+/**
+ * @openapi
+ * /api/posts/search:
+ *   get:
+ *     tags: [帖子]
+ *     summary: 搜索帖子
+ *     parameters:
+ *       - name: keyword
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *         description: 搜索关键词
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *         description: 页码
+ *       - name: pageSize
+ *         in: query
+ *         schema: { type: integer, default: 20 }
+ *         description: 每页数量
+ *     responses:
+ *       200:
+ *         description: 成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Post' } }
+ */
 router.get('/search', validateRequest(searchPostsSchema), asyncHandler(async (req, res) => {
   const result = await searchPosts(req.query);
   success(res, result);
@@ -54,17 +122,9 @@ router.get('/hot', asyncHandler(async (req, res) => {
 // 获取帖子详情（可选认证，记录浏览行为）
 router.get('/:id', validateRequest(postIdSchema), optionalAuthMiddleware, asyncHandler(async (req, res) => {
   const post = await getPostById(req.params.id);
-  await viewPost(req.params.id);
-  // 记录浏览行为（支持 sessionDuration 浏览停留时长）
-  if (req.user) {
-    recordAction({
-      userId: req.user.id,
-      postId: req.params.id,
-      targetUserId: post.authorId,
-      actionType: ActionType.VIEW,
-      sessionDuration: req.query.duration ? parseInt(req.query.duration) : undefined,
-    });
-  }
+  const userId = req.user?.id;
+  const duration = req.query.duration ? parseInt(req.query.duration) : undefined;
+  await viewPost(req.params.id, duration, userId);
   success(res, post);
 }));
 
@@ -78,7 +138,7 @@ router.get('/:id/history', authMiddleware, validateRequest(postIdSchema), asyncH
 }));
 
 // 创建帖子（需认证 — 在路由层验证 authorId 来自 req.user）
-router.post('/', authMiddleware, validateRequest(createPostSchema), asyncHandler(async (req, res) => {
+router.post('/', authMiddleware, communityNormsMiddleware('POST'), validateRequest(createPostSchema), asyncHandler(async (req, res) => {
   const authorId = req.user.id;
   const authorName = req.user.username;
   const post = await createPost({ ...req.body, authorId, authorName });
@@ -166,7 +226,9 @@ router.post('/:id/share', validateRequest(postIdSchema), optionalAuthMiddleware,
 
 // 浏览帖子
 router.post('/:id/view', validateRequest(postIdSchema), asyncHandler(async (req, res) => {
-  await viewPost(req.params.id);
+  const duration = req.query.duration ? parseInt(req.query.duration) : undefined;
+  const userId = req.user?.id;
+  await viewPost(req.params.id, duration, userId);
   success(res, { message: 'ok' });
 }));
 

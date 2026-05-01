@@ -17,10 +17,10 @@ export function initWebSocket(server) {
     },
   });
 
-  // 认证中间件
+  // 认证中间件（SEC-15: 必须认证，禁止匿名连接）
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    if (!token) return next(); // 允许匿名连接
+    if (!token) return next(new Error('未授权，请先登录'));
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       socket.user = decoded;
@@ -44,6 +44,26 @@ export function initWebSocket(server) {
 
     socket.on('leave-post', (postId) => {
       socket.leave(`post:${postId}`);
+    });
+
+    // 加入会话房间（私信）
+    socket.on('join-conversation', (conversationId) => {
+      if (socket.user && conversationId) {
+        socket.join(`conversation:${conversationId}`);
+      }
+    });
+
+    socket.on('leave-conversation', (conversationId) => {
+      if (conversationId) {
+        socket.leave(`conversation:${conversationId}`);
+      }
+    });
+
+    // 转发私信消息给会话房间其他成员
+    socket.on('send-message', ({ conversationId, message }) => {
+      if (socket.user && conversationId && message) {
+        socket.to(`conversation:${conversationId}`).emit('new-message', { conversationId, message });
+      }
     });
 
     // 加入用户房间（接收个人通知）

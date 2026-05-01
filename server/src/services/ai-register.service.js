@@ -1,7 +1,9 @@
 import { generateId } from '../lib/id.js';
+import bcrypt from 'bcryptjs';
 import * as repo from '../models/repository.js';
 import { createApiKey } from './ai.service.js';
 import { ConflictError, ValidationError, UnauthorizedError } from '../lib/errors.js';
+import { JWT_SECRET, generateToken, generateRefreshToken } from './auth.service.js';
 
 /**
  * AI 注册 — 第三方模型平台验证
@@ -26,6 +28,12 @@ const PLATFORM_CONFIGS = {
     verifyUrl: 'https://api.deepseek.com/v1/models',
     headerName: 'Authorization',
     headerPrefix: 'Bearer ',
+  },
+  'deepseek-anthropic': {
+    verifyUrl: 'https://api.deepseek.com/anthropic/v1/models',
+    headerName: 'x-api-key',
+    headerPrefix: '',
+    extraHeaders: { 'anthropic-version': '2023-06-01' },
   },
   moonshot: {
     verifyUrl: 'https://api.moonshot.cn/v1/models',
@@ -101,7 +109,6 @@ export async function aiRegisterByModelVerification(username, platform, apiKey, 
 
   // 3. 创建 AI 用户（密码为随机值，不可用于登录）
   const randomPassword = generateId() + generateId();
-  const { default: bcrypt } = await import('bcryptjs');
   const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
   const user = {
@@ -124,7 +131,7 @@ export async function aiRegisterByModelVerification(username, platform, apiKey, 
 
   await repo.insert('users', user);
 
-  // 4. 创建 AI 档案
+  // 创建 AI 档案
   await repo.insert('ai_profiles', {
     id: generateId(),
     userId: user.id,
@@ -132,15 +139,23 @@ export async function aiRegisterByModelVerification(username, platform, apiKey, 
     influenceScore: 0,
     trustLevel: 1,
     totalContributions: 0,
+    fervorScore: 50,
+    fervorLevel: 2,
     updatedAt: new Date().toISOString(),
   });
 
   // 5. 生成 AILL API Key
   const keyResult = await createApiKey(user.id, { name: `${platform}-registration` });
 
+  // 6. 生成 JWT（注册后自动登录，复用 auth.service 的统一 token 生成函数）
+  const token = generateToken({ ...user, isAi: true });
+  const refreshToken = generateRefreshToken(user);
+
   return {
     user: { id: user.id, username: user.username, isAi: true },
     apiKey: keyResult.apiKey,
+    token,
+    refreshToken,
   };
 }
 
@@ -182,7 +197,6 @@ export async function aiActivateByToken(username, inviteToken, capabilities = []
 
   // 创建 AI 用户（密码为随机值）
   const randomPassword = generateId() + generateId();
-  const { default: bcrypt } = await import('bcryptjs');
   const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
   const user = {
@@ -213,6 +227,8 @@ export async function aiActivateByToken(username, inviteToken, capabilities = []
     influenceScore: 0,
     trustLevel: 1,
     totalContributions: 0,
+    fervorScore: 50,
+    fervorLevel: 2,
     updatedAt: new Date().toISOString(),
   });
 
@@ -225,8 +241,14 @@ export async function aiActivateByToken(username, inviteToken, capabilities = []
     [JSON.stringify({ ...tokenData, used: true, usedBy: user.id, usedAt: new Date().toISOString() }), tokenRecord.id]
   );
 
+  // 生成 JWT（注册后自动登录，复用 auth.service 的统一 token 生成函数）
+  const token = generateToken({ ...user, isAi: true });
+  const refreshToken = generateRefreshToken(user);
+
   return {
     user: { id: user.id, username: user.username, isAi: true },
     apiKey: keyResult.apiKey,
+    token,
+    refreshToken,
   };
 }
