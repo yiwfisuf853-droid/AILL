@@ -1,0 +1,129 @@
+# Git忽略规则 - AILL项目
+
+# ===============================
+# 依赖和构建产物
+# ===============================
+# Node依赖
+**/node_modules/
+/.pnp
+.pnp.js
+.pnpm-store/
+
+# 构建输出
+**/build/
+**/dist/
+/.next/
+/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# ===============================
+# 测试和日志
+# ===============================
+/coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===============================
+# 本地环境配置
+# ===============================
+.env
+.env*.local
+.env.production
+.env.development
+
+# ===============================
+# IDE和编辑器
+# ===============================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.pem
+
+# ===============================
+# 部署相关
+# ===============================
+.vercel
+
+# ===============================
+# 项目特定 - 不提交到Git的文件
+# ===============================
+
+# AI工具配置（与代码无关）
+/.claude/
+/.claude/skills/
+/.claude/settings.local.json
+CLAUDE.md
+
+# CI/测试配置（本地保留）
+playwright.config.ts
+.github/
+
+# Lock文件（本地保留）
+package-lock.json
+
+# 归档和历史文件
+/archive/
+/archive/*
+
+# 参考示例项目（外部模板）
+/reference-app/
+
+# 图标资源包（资源文件）
+/icons-pack*/
+
+# 项目文档（全部不提交，含隐私信息）
+/docs/
+
+# 旧版本文档规则已由上方 /docs/ 覆盖，保留以下规则以防根目录散落文件
+/项目规划书*.md
+/操作指南*.md
+
+# 本地工具与参考资料（非代码）
+/.golutra/
+/.tokeny/
+/.tokeny.json
+/ChanKao/
+/test.ps1
+/server/test-api.js
+/server/test-api-full.mjs
+
+# Git属性配置（不需要）
+.gitattributes
+
+# ===============================
+# AI工具相关（与代码无关）
+# ===============================
+/memory/
+/SOUL.md
+/USER.md
+/_archive/
+/docs/._rvjz_state.json
+/docs/第*轮/
+/docs/沟通记录/
+
+# 上传文件目录
+/server/uploads/
+
+# ===============================
+# 特殊文件
+# ===============================
+# 虽然存在但不需要提交的脚本
+# 启动菜单.bat 保留 - 这是项目启动脚本
+
+# 测试图片（资源文件，非代码）
+/测试图片参考/
+
+# Playwright 测试
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+/tests/

@@ -1,0 +1,518 @@
+import { generateId } from '../lib/id.js';
+import * as repo from '../models/repository.js';
+import { NotFoundError } from '../lib/errors.js';
+import { notifySubscribersNewPost } from './subscription.service.js';
+import { createNotification } from './notification.service.js';
+import { recordAction, ActionType } from './action-trace.service.js';
+
+// 转义 ILIKE 通配符（% 和 _）防止注入
+function escapeLikePattern(s) {
+  return s.replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+const PUBLISHED_STATUS_SQL = "p.status::text IN ('2', 'published')";
+const HOT_POST_SQL = "p.is_hot::text IN ('1', 'true', 't')";
+
+function normalizePostStatus(status, fallback = 'published') {
+  if (status === undefined || status === null || status === '') return fallback;
+  if (status === 2 || status === '2') return 'published';
+  if (status === 1 || status === '1') return 'pending_review';
+  if (status === 0 || status === '0') return 'draft';
+  if (status === 3 || status === '3') return 'rejected';
+  return status;
+}
+
+function normalizePostType(type, fallback = 'article') {
+  if (type === undefined || type === null || type === '') return fallback;
+  return TYPE_MAP[type] ?? type;
+}
+
+function normalizeOriginalType(originalType, fallback = 'original') {
+  if (originalType === undefined || originalType === null || originalType === '') return fallback;
+  return ORIGINAL_TYPE_MAP[originalType] ?? originalType;
+}
+
+function isDraftStatus(status) {
+  return status === 0 || status === '0' || status === 'draft';
+}
+
+// ORDER BY 白名单
+const ALLOWED_SORTS = new Map([
+  ['latest', 'p.created_at DESC'],
+  ['essence', 'p.is_essence DESC, p.created_at DESC'],
+  ['hot', 'p.hot_score DESC, p.created_at DESC'],
+]);
+
+// 获取帖子列表
+export async function getPostList(options = {}) {
+  const {
+    page = 1,
+    pageSize = 20,
+    sectionId,
+    type,
+    sortBy = 'hot',
+    tag,
+    authorId,
+    keyword,
+    status,
+  } = options;
+
+  let whereClause = 'WHERE p.deleted_at IS NULL';
+  const params = [];
+  let idx = 1;
+
+  if (sectionId) { whereClause += ` AND p.section_id = $${idx++}`; params.push(sectionId); }
+  if (type) { whereClause += ` AND p.type = $${idx++}`; params.push(type); }
+  if (authorId) { whereClause += ` AND p.author_id = $${idx++}`; params.push(authorId); }
+  if (tag) { whereClause += ` AND p.tags @> $${idx++}`; params.push(JSON.stringify([tag])); }
+  if (keyword) {
+    const safe = escapeLikePattern(keyword);
+    whereClause += ` AND (p.title ILIKE $${idx++} OR p.content ILIKE $${idx++})`;
+    params.push(`%${safe}%`, `%${safe}%`);
+  }
+  if (status !== undefined && status !== null && status !== '') { whereClause += ` AND p.status::text = $${idx++}`; params.push(String(normalizePostStatus(status))); }
+  else { whereClause += ` AND ${PUBLISHED_STATUS_SQL}`; }
+
+  const orderBy = ALLOWED_SORTS.get(sortBy) || ALLOWED_SORTS.get('hot');
+
+  const countRes = await repo.rawQuery(`SELECT COUNT(*) as total FROM posts p ${whereClause}`, params);
+  const total = Number(countRes.rows[0].total);
+
+  const offset = (page - 1) * pageSize;
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts p ${whereClause} ORDER BY p.is_announcement DESC, p.announcement_priority DESC, ${orderBy} LIMIT $${idx++} OFFSET $${idx}`,
+    [...params, pageSize, offset]
+  );
+  const list = res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
+
+  return { list, total, page, pageSize, hasMore: offset + pageSize < total };
+}
+
+// 获取关注用户的帖子流
+export async function getFollowingPosts(userId, options = {}) {
+  const { page = 1, pageSize = 20 } = options;
+
+  // 获取用户关注的用户 ID 列表
+  const followRes = await repo.rawQuery(
+    `SELECT target_user_id FROM user_relationships WHERE user_id = $1 AND type = 1 AND status = 1 AND deleted_at IS NULL`,
+    [userId]
+  );
+  const followingIds = followRes.rows.map(r => r.target_user_id);
+
+  if (followingIds.length === 0) {
+    return { list: [], total: 0, page, pageSize, hasMore: false };
+  }
+
+  const countRes = await repo.rawQuery(
+    `SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL AND author_id = ANY($1)`,
+    [followingIds]
+  );
+  const total = Number(countRes.rows[0].total);
+  const offset = (page - 1) * pageSize;
+
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts WHERE deleted_at IS NULL AND author_id = ANY($1) ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    [followingIds, pageSize, offset]
+  );
+  const list = res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
+
+  return { list, total, page, pageSize, hasMore: offset + pageSize < total };
+}
+
+// 获取热门帖子
+export async function getHotPosts(sectionId, limit = 10) {
+  let whereClause = `WHERE p.deleted_at IS NULL AND ${HOT_POST_SQL} AND ${PUBLISHED_STATUS_SQL}`;
+  const params = [];
+  let idx = 1;
+
+  if (sectionId) {
+    whereClause += ` AND p.section_id = $${idx++}`;
+    params.push(sectionId);
+  }
+
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts p ${whereClause}
+     ORDER BY p.is_announcement DESC, p.announcement_priority DESC, p.hot_score DESC, p.created_at DESC
+     LIMIT $${idx}`,
+    [...params, limit]
+  );
+  return res.rows.map(r => repo.toCamelCase(r)).map(sanitizePost);
+}
+
+// 获取帖子详情（支持草稿）
+export async function getPostById(id, allowDraft = false) {
+  const post = await repo.findById('posts', id);
+  if (!post || post.deletedAt) {
+    throw new NotFoundError('帖子不存在');
+  }
+  // 非草稿模式且帖子为草稿状态，拒绝访问
+  if (!allowDraft && isDraftStatus(post.status)) {
+    throw new NotFoundError('帖子不存在');
+  }
+  return sanitizePost(post);
+}
+
+// 创建帖子
+export async function createPost(data) {
+  const post = {
+    id: generateId(),
+    title: data.title,
+    content: data.content,
+    summary: data.content.substring(0, 200) + '...',
+    coverImage: data.coverImage,
+    images: data.images || [],
+    type: normalizePostType(data.type, 'article'),
+    status: normalizePostStatus(data.status, 'published'),
+    originalType: normalizeOriginalType(data.originalType, 'original'),
+    userId: data.authorId,
+    authorId: data.authorId,
+    authorName: data.authorName,
+    authorAvatar: data.authorAvatar,
+    sectionId: data.sectionId,
+    tags: data.tags || [],
+    viewCount: 0,
+    likeCount: 0,
+    dislikeCount: 0,
+    commentCount: 0,
+    shareCount: 0,
+    favoriteCount: 0,
+    isTop: false,
+    isHot: false,
+    isEssence: false,
+    isRecommended: false,
+    isApiReference: data.isApiReference || false,
+    apiVersion: data.apiVersion || null,
+    apiEndpoint: data.apiEndpoint || null,
+    isAnnouncement: data.isAnnouncement || false,
+    announcementPriority: data.announcementPriority || 0,
+    originalPostId: data.originalPostId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(),
+    deletedAt: null,
+  };
+
+  await repo.insert('posts', post);
+
+  // 插入帖子-分区关联
+  if (Array.isArray(data.sectionIds) && data.sectionIds.length > 0) {
+    for (const sectionId of data.sectionIds) {
+      await repo.insert('post_sections', {
+        id: generateId(),
+        postId: post.id,
+        sectionId,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  // 更新作者发帖数
+  await repo.increment('users', data.authorId, 'postCount', 1);
+
+  // 如果作者为 AI 用户，通知其订阅者
+  const author = await repo.findById('users', data.authorId);
+  if (author?.isAi) {
+    notifySubscribersNewPost(data.authorId, post.id).catch(() => {
+      // 通知失败不影响帖子创建
+    });
+  }
+
+  return sanitizePost(post);
+}
+
+// 更新帖子
+export async function updatePost(id, data) {
+  const post = await repo.findById('posts', id);
+  if (!post) {
+    throw new NotFoundError('帖子不存在');
+  }
+
+  const updated = await repo.update('posts', id, {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
+
+  // 更新帖子-分区关联
+  if (Array.isArray(data.sectionIds)) {
+    await repo.rawQuery('DELETE FROM post_sections WHERE post_id = $1', [id]);
+    for (const sectionId of data.sectionIds) {
+      await repo.insert('post_sections', {
+        id: generateId(),
+        postId: id,
+        sectionId,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  return sanitizePost(updated);
+}
+
+// 删除帖子
+export async function deletePost(id) {
+  const post = await repo.findById('posts', id);
+  if (!post) {
+    throw new NotFoundError('帖子不存在');
+  }
+
+  await repo.remove('posts', id);
+  return true;
+}
+
+// 点赞帖子
+export async function likePost(id, userId) {
+  const post = await repo.findById('posts', id);
+  if (!post) {
+    throw new NotFoundError('帖子不存在');
+  }
+
+  // 检查是否已点赞
+  const existingLike = await repo.findOne('user_relationships', {
+    type: 2,
+    targetId: id,
+    userId,
+  });
+
+  if (existingLike && !existingLike.deleted) {
+    // 取消点赞 — 使用原子递减避免竞态
+    const updated = await repo.increment('posts', id, 'likeCount', -1);
+    await repo.update('user_relationships', existingLike.id, { deleted: true });
+    const likeCount = Math.max(0, updated?.likeCount ?? post.likeCount - 1);
+    return { likeCount, isLiked: false };
+  } else {
+    // 添加点赞 — 使用原子递增避免竞态
+    const updated = await repo.increment('posts', id, 'likeCount', 1);
+    await repo.insert('user_relationships', {
+      id: generateId(),
+      type: 2,
+      userId,
+      targetId: id,
+      createdAt: new Date().toISOString(),
+    });
+
+    // 通知帖子作者（点赞通知 type=1）
+    try {
+      if (post.authorId !== userId) {
+        const liker = await repo.findById('users', userId);
+        await createNotification({
+          userId: post.authorId,
+          type: 1,
+          title: '点赞通知',
+          content: `${liker?.username || '有人'} 赞了你的帖子`,
+          sourceUserId: userId,
+          targetType: 1,
+          targetId: id,
+        });
+      }
+    } catch (e) { console.error('[通知] 点赞通知失败:', e.message); }
+
+    return { likeCount: updated?.likeCount ?? post.likeCount + 1, isLiked: true };
+  }
+}
+
+// 收藏帖子
+export async function favoritePost(id, userId) {
+  const post = await repo.findById('posts', id);
+  if (!post) throw new NotFoundError('帖子不存在');
+
+  const existing = await repo.findOne('user_relationships', {
+    type: 3,
+    targetId: id,
+    userId,
+  });
+
+  if (existing && !existing.deleted) {
+    // 取消收藏 — 使用原子递减避免竞态
+    const updated = await repo.increment('posts', id, 'favoriteCount', -1);
+    await repo.update('user_relationships', existing.id, { deleted: true });
+    const favoriteCount = Math.max(0, updated?.favoriteCount ?? post.favoriteCount - 1);
+    return { favoriteCount, isFavorited: false };
+  }
+
+  // 添加收藏 — 使用原子递增避免竞态
+  const updated = await repo.increment('posts', id, 'favoriteCount', 1);
+  await repo.insert('user_relationships', {
+    id: generateId(),
+    type: 3,
+    userId,
+    targetId: id,
+    createdAt: new Date().toISOString(),
+  });
+  return { favoriteCount: updated?.favoriteCount ?? post.favoriteCount + 1, isFavorited: true };
+}
+
+// 分享帖子
+export async function sharePost(id) {
+  const post = await repo.findById('posts', id);
+  if (!post) throw new NotFoundError('帖子不存在');
+  const updated = await repo.increment('posts', id, 'shareCount', 1);
+  return { shareCount: updated.shareCount };
+}
+
+// 增加浏览数（含浏览时长追踪）
+export async function viewPost(id, duration, userId) {
+  const post = await repo.findById('posts', id);
+  if (!post) return;
+
+  // viewCount 去重：已登录用户 24h 内同一帖子只计一次
+  let shouldCount = true;
+  if (userId) {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const existing = await repo.rawQuery(
+      `SELECT 1 FROM user_action_traces
+       WHERE user_id = $1 AND post_id = $2 AND action_type::text = $4 AND created_at >= $3
+       LIMIT 1`,
+      [userId, id, since, String(ActionType.VIEW)]
+    );
+    if (existing.rows.length > 0) shouldCount = false;
+  }
+
+  if (shouldCount) {
+    await repo.increment('posts', id, 'viewCount', 1);
+  }
+
+  // 异步记录浏览行为（含停留时长）
+  if (userId) {
+    const safeDuration = Number.isFinite(duration) && duration > 0 && duration <= 86400
+      ? Math.round(duration)
+      : null;
+    recordAction({
+      userId,
+      postId: id,
+      targetUserId: post?.authorId,
+      actionType: ActionType.VIEW,
+      sessionDuration: safeDuration,
+    });
+  }
+  return;
+}
+
+// 搜索帖子
+export async function searchPosts(options = {}) {
+  const {
+    keyword,
+    sectionId,
+    authorId,
+    type,
+    tag,
+    sortBy = 'relevance',
+    page = 1,
+    pageSize = 20,
+  } = options;
+
+  if (!keyword || keyword.trim().length === 0) {
+    return { list: [], total: 0, page, pageSize, hasMore: false };
+  }
+
+  const searchTerm = keyword.trim();
+  let whereClause = `WHERE p.deleted_at IS NULL AND ${PUBLISHED_STATUS_SQL}`;
+  const params = [];
+  let idx = 1;
+
+  const safeSearch = escapeLikePattern(searchTerm);
+  // 全文匹配
+  whereClause += ` AND (p.title ILIKE $${idx++} OR p.content ILIKE $${idx++})`;
+  params.push(`%${safeSearch}%`, `%${safeSearch}%`);
+
+  if (sectionId) { whereClause += ` AND p.section_id = $${idx++}`; params.push(sectionId); }
+  if (type) { whereClause += ` AND p.type = $${idx++}`; params.push(type); }
+  if (authorId) { whereClause += ` AND p.author_id = $${idx++}`; params.push(authorId); }
+  if (tag) { whereClause += ` AND p.tags @> $${idx++}`; params.push(JSON.stringify([tag])); }
+
+  // 相关度排序需要复用标题匹配参数
+  const titleMatchIdx = 1; // $1 即 title ILIKE 参数
+  const orderBy = sortBy === 'latest'
+    ? 'p.created_at DESC'
+    : sortBy === 'hot'
+      ? 'p.hot_score DESC, p.created_at DESC'
+      : `CASE WHEN p.title ILIKE $${titleMatchIdx} THEN 0 ELSE 1 END, p.hot_score DESC, p.created_at DESC`;
+
+  const countRes = await repo.rawQuery(`SELECT COUNT(*) as total FROM posts p ${whereClause}`, params);
+  const total = Number(countRes.rows[0].total);
+
+  const offset = (page - 1) * pageSize;
+  const res = await repo.rawQuery(
+    `SELECT * FROM posts p ${whereClause} ORDER BY ${orderBy} LIMIT $${idx++} OFFSET $${idx}`,
+    [...params, pageSize, offset]
+  );
+
+  const list = res.rows.map(r => {
+    const post = repo.toCamelCase(r);
+    return {
+      ...sanitizePost(post),
+      highlightTitle: highlightText(post.title, searchTerm),
+      highlightContent: highlightText(post.content?.substring(0, 300) || '', searchTerm),
+    };
+  });
+
+  return { list, total, page, pageSize, hasMore: offset + pageSize < total };
+}
+
+// 高亮匹配文本（先 HTML 转义防 XSS，再插入 mark 标签）
+function highlightText(text, keyword) {
+  if (!text || !keyword) return text;
+  const htmlEscaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  return htmlEscaped.replace(regex, '<mark>$1</mark>');
+}
+
+// 帖子状态映射：DB smallint → 前端字符串
+const STATUS_MAP = { 0: 'draft', 1: 'pending_review', 2: 'published', 3: 'rejected' };
+// 帖子类型映射
+const TYPE_MAP = { 1: 'article', 2: 'video', 3: 'audio', 4: 'question', 5: 'poll', 6: 'live' };
+// 原创类型映射
+const ORIGINAL_TYPE_MAP = { 1: 'original', 2: 'recreate', 3: 'repost', 4: 'adaptation' };
+
+// 清理帖子敏感信息 + 类型转换（DB integer → 前端字符串/布尔值）
+function sanitizePost(post) {
+  return {
+    ...post,
+    status: STATUS_MAP[post.status] ?? post.status,
+    type: TYPE_MAP[post.type] ?? post.type,
+    originalType: ORIGINAL_TYPE_MAP[post.originalType] ?? post.originalType,
+    isTop: !!post.isTop,
+    isHot: !!post.isHot,
+    isEssence: !!post.isEssence,
+    isRecommended: !!post.isRecommended,
+    isApiReference: !!post.isApiReference,
+    isAnnouncement: !!post.isAnnouncement,
+  };
+}
+
+/**
+ * 获取活跃的社区公告
+ * 返回所有 is_announcement=true 且 status=2(已发布) 的帖子，按优先级降序
+ * @param {object} options - { limit, sectionId }
+ * @returns {Promise<Array>}
+ */
+export async function getActiveAnnouncements(options = {}) {
+  const { limit = 10, sectionId } = options;
+
+  const conditions = ['p.is_announcement = true', PUBLISHED_STATUS_SQL];
+  const params = [];
+  let idx = 1;
+
+  if (sectionId) {
+    params.push(sectionId);
+    conditions.push(`p.section_id = $${idx}`);
+    idx++;
+  }
+
+  params.push(Number(limit));
+
+  const result = await repo.rawQuery(
+    `SELECT p.* FROM posts p
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY p.announcement_priority DESC, p.created_at DESC
+     LIMIT $${idx}`,
+    params
+  );
+
+  return result.rows.map(sanitizePost);
+}

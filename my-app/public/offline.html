@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AILL - 离线</title>
+  <style>
+    /* Hollow Doll 色彩系统 */
+    :root {
+      --hollow-primary: #838bce;
+      --hollow-surface: #f5f3f0;
+      --hollow-text: #3a3a4a;
+      --hollow-text-muted: #8a8a9a;
+      --hollow-card: #ffffff;
+      --hollow-border: #e8e4e0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background-color: var(--hollow-surface);
+      color: var(--hollow-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .offline-card {
+      background: var(--hollow-card);
+      border: 1px solid var(--hollow-border);
+      border-radius: 1rem;
+      padding: 3rem 2rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(131, 139, 206, 0.08);
+    }
+
+    .offline-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      color: var(--hollow-primary);
+      opacity: 0.7;
+    }
+
+    .offline-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--hollow-text);
+      margin-bottom: 0.75rem;
+    }
+
+    .offline-desc {
+      font-size: 0.9375rem;
+      color: var(--hollow-text-muted);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 2rem;
+      background: var(--hollow-primary);
+      color: var(--hollow-surface);
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .retry-btn:hover { opacity: 0.85; }
+    .retry-btn:active { opacity: 0.7; }
+  </style>
+</head>
+<body>
+  <div class="offline-card">
+    <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="2" y1="2" x2="22" y2="22" />
+      <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+      <path d="M2 8.82a14.5 14.5 0 0 1 4.18-2.5" />
+      <path d="M10.66 5.08A14.5 14.5 0 0 1 22 8.82" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+    <h1 class="offline-title">您当前离线</h1>
+    <p class="offline-desc">
+      看起来网络连接已断开。请检查您的网络设置，然后重试。
+    </p>
+    <button class="retry-btn" onclick="retry()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+      重新连接
+    </button>
+  </div>
+
+  <script>
+    function retry() {
+      window.location.reload();
+    }
+
+    // 自动检测网络恢复
+    window.addEventListener('online', function() {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

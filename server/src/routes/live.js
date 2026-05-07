@@ -1,0 +1,271 @@
+import express from 'express';
+import { asyncHandler, ForbiddenError } from '../lib/errors.js';
+import { success, created, deleted } from '../lib/response.js';
+import {
+  getLiveRooms,
+  getLiveRoomDetail,
+  createLiveRoom,
+  startLive,
+  endLive,
+  deleteLiveRoom,
+  getLiveMessages,
+  sendLiveMessage,
+  getLiveGifts,
+  sendGift,
+} from '../services/live.service.js';
+import { validateRequest } from '../middleware/validate.js';
+import { createRoomSchema, sendMessageSchema, sendGiftSchema } from '../validations/live.js';
+import { authMiddleware } from '../services/auth.service.js';
+import * as repo from '../models/repository.js';
+
+const router = express.Router();
+
+// ========== 直播间 ==========
+
+/**
+ * @openapi
+ * /api/live/rooms:
+ *   get:
+ *     tags: [直播]
+ *     summary: 直播间列表
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/rooms', asyncHandler(async (req, res) => {
+  const result = await getLiveRooms(req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{id}/recordings:
+ *   get:
+ *     tags: [直播]
+ *     summary: 获取直播回放列表
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/rooms/:id/recordings', asyncHandler(async (req, res) => {
+  const recordings = await repo.findAll('live_recordings', { where: { roomId: req.params.id, status: 1 } });
+  success(res, recordings);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{id}:
+ *   get:
+ *     tags: [直播]
+ *     summary: 直播间详情
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/rooms/:id', asyncHandler(async (req, res) => {
+  const result = await getLiveRoomDetail(req.params.id);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms:
+ *   post:
+ *     tags: [直播]
+ *     summary: 创建直播间（需认证）
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title: { type: string }
+ *               description: { type: string }
+ *     responses:
+ *       201:
+ *         description: 创建成功
+ */
+router.post('/rooms', validateRequest(createRoomSchema), asyncHandler(async (req, res) => {
+  // userId 始终从认证信息获取，防止伪造
+  const data = { ...req.body, userId: req.user.id };
+  const result = await createLiveRoom(data);
+  created(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{id}/start:
+ *   post:
+ *     tags: [直播]
+ *     summary: 开始直播
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 开始成功
+ */
+router.post('/rooms/:id/start', asyncHandler(async (req, res) => {
+  const result = await startLive(req.params.id);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{id}/end:
+ *   post:
+ *     tags: [直播]
+ *     summary: 结束直播
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 结束成功
+ */
+router.post('/rooms/:id/end', asyncHandler(async (req, res) => {
+  const result = await endLive(req.params.id);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{id}:
+ *   delete:
+ *     tags: [直播]
+ *     summary: 删除直播间
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ */
+router.delete('/rooms/:id', asyncHandler(async (req, res) => {
+  await deleteLiveRoom(req.params.id);
+  deleted(res);
+}));
+
+// ========== 直播互动 ==========
+
+/**
+ * @openapi
+ * /api/live/rooms/{roomId}/messages:
+ *   get:
+ *     tags: [直播]
+ *     summary: 获取直播消息
+ *     parameters:
+ *       - name: roomId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/rooms/:roomId/messages', asyncHandler(async (req, res) => {
+  const result = await getLiveMessages(req.params.roomId, req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{roomId}/messages:
+ *   post:
+ *     tags: [直播]
+ *     summary: 发送直播消息（需认证）
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: roomId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content: { type: string }
+ *               type: { type: string }
+ *     responses:
+ *       201:
+ *         description: 发送成功
+ */
+router.post('/rooms/:roomId/messages', authMiddleware, validateRequest(sendMessageSchema), asyncHandler(async (req, res) => {
+  const data = { ...req.body, userId: req.user.id };
+  const result = await sendLiveMessage(req.params.roomId, data);
+  created(res, result);
+}));
+
+// ========== 礼物 ==========
+
+/**
+ * @openapi
+ * /api/live/gifts:
+ *   get:
+ *     tags: [直播]
+ *     summary: 获取礼物列表
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/gifts', asyncHandler(async (req, res) => {
+  const result = await getLiveGifts();
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/live/rooms/{roomId}/gift:
+ *   post:
+ *     tags: [直播]
+ *     summary: 送礼物（需认证）
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: roomId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               giftId: { type: string }
+ *               quantity: { type: integer }
+ *     responses:
+ *       201:
+ *         description: 送出成功
+ */
+router.post('/rooms/:roomId/gift', authMiddleware, validateRequest(sendGiftSchema), asyncHandler(async (req, res) => {
+  const data = { ...req.body, userId: req.user.id };
+  const result = await sendGift(req.params.roomId, data);
+  created(res, result);
+}));
+
+export default router;

@@ -1,0 +1,256 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { SEO } from '@/components/common/SEO';
+import { usePortalStore } from '@/features/portal/store';
+import type { Ranking, MustSeeItem, Announcement } from '@/features/portal/store';
+import { IconCampaign, IconClock, IconEye, IconFire, IconStar, IconTrophy } from "@/components/ui/Icon";
+import { PageSkeleton } from '@/components/ui/Skeleton';
+
+export function RankingsPage() {
+  const { rankings, mustSeeList, announcements, loading, setActiveSquareTab, fetchRankings, fetchMustSee, fetchAnnouncements } = usePortalStore();
+
+  useEffect(() => {
+    fetchRankings({ rankType: 'hot', period: 'weekly' });
+    fetchMustSee();
+    fetchAnnouncements();
+  }, [fetchRankings, fetchMustSee, fetchAnnouncements]);
+
+  // 兼容：rankings store 用 activeTab，portal store 用 activeSquareTab
+  const [activeTab, setActiveTabRaw] = useState<'hot' | 'mustsee' | 'announce'>('hot');
+
+  const setActiveTab = (tab: 'hot' | 'mustsee' | 'announce') => {
+    setActiveTabRaw(tab);
+  };
+
+  const tabConfig = [
+    { key: 'hot' as const, label: '热榜', icon: IconFire },
+    { key: 'mustsee' as const, label: '必看', icon: IconEye },
+    { key: 'announce' as const, label: '公告', icon: IconCampaign },
+  ];
+
+  const typeLabel = (t: number) => {
+    const map: Record<number, string> = { 1: '系统', 2: '活动', 3: '重要' };
+    return map[t] || '通知';
+  };
+  const typeColor = (t: number) => {
+    const map: Record<number, string> = {
+      1: 'bg-primary/15 text-primary border border-primary/20',
+      2: 'bg-success/12 text-success border border-success/20',
+      3: 'bg-destructive/15 text-destructive border border-destructive/20',
+    };
+    return map[t] || 'bg-muted text-muted-foreground border border-border';
+  };
+
+  const rankBadge = (i: number) => {
+    if (i === 0) return 'bg-gradient-to-br from-warning to-warning/80 text-white';
+    if (i === 1) return 'bg-gradient-to-br from-muted to-muted-foreground/40 text-foreground';
+    if (i === 2) return 'bg-gradient-to-br from-warning/80 to-warning/60 text-white';
+    return 'bg-muted text-muted-foreground';
+  };
+
+  const rankEmoji = (i: number) => {
+    if (i === 0) return '1';
+    if (i === 1) return '2';
+    if (i === 2) return '3';
+    return null;
+  };
+
+  return (
+    <div className="py-3" data-name="rankings">
+      <SEO title="排行榜 - AILL | AI与人类共创社区" description="社区热门排行、必看内容和公告" />
+      {/* Hero Banner */}
+      <div className="relative overflow-hidden border-b border-border" data-name="rankingsHero">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(135deg, hsl(var(--warning) / 0.08) 0%, transparent 40%, hsl(var(--warning) / 0.04) 100%)',
+          }}
+        />
+        <div className="absolute inset-0 opacity-30" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, hsl(var(--warning) / 0.12) 0%, transparent 50%)',
+        }} />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20 bg-warning" />
+        <div className="relative pt-10 pb-8" data-name="rankingsHeroContent">
+          <div className="flex items-center gap-3 mb-2" data-name="rankingsHeroTitleRow">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg border bg-warning/15 border-warning/25">
+              <IconTrophy size={20} className="text-warning" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground" data-name="rankingsTitle">
+                AILL <span className="textGradientBrand">Rankings</span>
+              </h1>
+            </div>
+          </div>
+          <p className="text-foreground-tertiary text-sm ml-[52px]" data-name="rankingsDesc">
+            发现最热内容 / 社区公告 / 必看精选
+          </p>
+        </div>
+      </div>
+
+      <div className="py-8 pb-16" data-name="rankingsContent">
+        {/* Tab Navigation */}
+        <div className="flex gap-1 p-1 bg-muted/60 rounded-lg w-fit mb-8 border border-border" data-name="rankingsTabs">
+          {tabConfig.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              data-name={`rankingsTab${key}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                activeTab === key
+                  ? 'bg-warning text-warning-foreground shadow-md'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-surface'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            {/* Hot Rankings */}
+            {activeTab === 'hot' && (
+              <div className="space-y-2" data-name="rankingsHotList">
+                {rankings.length === 0 ? (
+                  <div className="text-center py-24 text-foreground-tertiary" data-name="rankingsHotEmpty">
+                    <IconFire size={48} className="mx-auto mb-3 opacity-40" />
+                    <p className="text-foreground-secondary">排行榜尚未计算，请稍后再来</p>
+                  </div>
+                ) : (
+                  rankings.slice(0, 30).map((r: Ranking, i: number) => (
+                    <Link
+                      key={r.id}
+                      to={r.targetType === 1 ? `/posts/${r.targetId}` : `/users/${r.targetId}`}
+                      className="cardInteractive group flex items-center gap-4 p-4"
+                      data-name={`rankingsRankItem${r.id}`}
+                    >
+                      {/* Rank Number */}
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${rankBadge(i)}`}
+                        data-name={`rankingsRankItem${r.id}RankNo`}
+                      >
+                        {rankEmoji(i) ?? r.rankNo}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0" data-name={`rankingsRankItem${r.id}Info`}>
+                        <h3 className="font-semibold text-sm truncate text-foreground group-hover:text-primary transition-colors" data-name={`rankingsRankItem${r.id}Title`}>
+                          {r.target?.title || r.target?.username || `ID: ${r.targetId}`}
+                        </h3>
+                        {r.target?.authorName && (
+                          <p className="text-xs text-foreground-tertiary mt-0.5" data-name={`rankingsRankItem${r.id}Author`}>
+                            by {r.target.authorName}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Score */}
+                      <div className="text-right shrink-0" data-name={`rankingsRankItem${r.id}Score`}>
+                        <div className="text-sm font-mono font-semibold text-primary" data-name={`rankingsRankItem${r.id}ScoreValue`}>
+                          {Number(r.score).toFixed(1)}
+                        </div>
+                        <div className="text-xs text-foreground-tertiary" data-name={`rankingsRankItem${r.id}ScoreLabel`}>热度</div>
+                      </div>
+
+                      {/* Top 3 indicator */}
+                      {i < 3 && (
+                        <IconFire className={`w-4 h-4 shrink-0 ${
+                          i === 0 ? 'text-warning' : i === 1 ? 'text-foreground-secondary' : 'text-warning'
+                        }`} />
+                      )}
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Must See */}
+            {activeTab === 'mustsee' && (
+              <div className="space-y-2" data-name="rankingsMustSeeList">
+                {mustSeeList.length === 0 ? (
+                  <div className="text-center py-24 text-foreground-tertiary" data-name="rankingsMustSeeEmpty">
+                    <IconEye size={48} className="mx-auto mb-3 opacity-40" />
+                    <p className="text-foreground-secondary">暂无必看内容</p>
+                  </div>
+                ) : (
+                  mustSeeList.map((item: MustSeeItem) => (
+                    <Link
+                      key={item.id}
+                      to={`/posts/${item.postId}`}
+                      className="cardInteractive group block p-5"
+                      data-name={`rankingsMustSeeItem${item.id}`}
+                    >
+                      <div className="flex items-start gap-3" data-name={`rankingsMustSeeItem${item.id}Body`}>
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 shrink-0 mt-0.5">
+                          <IconStar size={16} className="text-accent" />
+                        </div>
+                        <div className="flex-1 min-w-0" data-name={`rankingsMustSeeItem${item.id}Info`}>
+                          <h3 className="font-semibold text-sm text-foreground group-hover:text-accent transition-colors" data-name={`rankingsMustSeeItem${item.id}Title`}>
+                            {item.post?.title || '帖子'}
+                          </h3>
+                          {item.reason && (
+                            <p className="text-sm text-foreground-secondary mt-1.5 leading-relaxed" data-name={`rankingsMustSeeItem${item.id}Reason`}>
+                              {item.reason}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Announcements */}
+            {activeTab === 'announce' && (
+              <div className="space-y-3" data-name="rankingsAnnounceList">
+                {announcements.length === 0 ? (
+                  <div className="text-center py-24 text-foreground-tertiary" data-name="rankingsAnnounceEmpty">
+                    <IconCampaign size={48} className="mx-auto mb-3 opacity-40" />
+                    <p className="text-foreground-secondary">暂无公告</p>
+                  </div>
+                ) : (
+                  announcements.map((a) => (
+                    <div
+                      key={a.id}
+                      className="cardInteractive group p-5"
+                      data-name={`rankingsAnnounceItem${a.id}`}
+                    >
+                      {/* Header row */}
+                      <div className="flex items-center gap-2.5 mb-3" data-name={`rankingsAnnounceItem${a.id}Header`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColor(a.type)}`} data-name={`rankingsAnnounceItem${a.id}TypeBadge`}>
+                          {typeLabel(a.type)}
+                        </span>
+                        {a.isSticky === 1 && (
+                          <span className="tagPill !bg-accent/15 !text-accent" data-name={`rankingsAnnounceItem${a.id}StickyBadge`}>置顶</span>
+                        )}
+                        <span className="text-xs text-foreground-tertiary ml-auto flex items-center gap-1" data-name={`rankingsAnnounceItem${a.id}Date`}>
+                          <IconClock size={12} />
+                          {new Date(a.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="font-semibold text-base text-foreground mb-2 group-hover:text-primary transition-colors" data-name={`rankingsAnnounceItem${a.id}Title`}>
+                        {a.title}
+                      </h3>
+
+                      {/* Content */}
+                      <p className="text-sm text-foreground-secondary leading-relaxed" data-name={`rankingsAnnounceItem${a.id}Content`}>
+                        {a.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

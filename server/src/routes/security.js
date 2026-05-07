@@ -1,0 +1,381 @@
+import express from 'express';
+import {
+  recordLoginAttempt,
+  checkLoginRestriction,
+  getIpBlacklist,
+  addIpToBlacklist,
+  removeIpFromBlacklist,
+  getBlockedDevices,
+  addDeviceToBlacklist,
+  removeDeviceFromBlacklist,
+  getRiskAssessments,
+  upsertRiskAssessment,
+  getFileMetadata,
+  createFileMetadata,
+  deleteFileMetadata,
+  getSystemConfigs,
+  getSystemConfig,
+  setSystemConfig,
+} from '../services/security.service.js';
+import { validateRequest } from '../middleware/validate.js';
+import { loginAttemptSchema, ipBlacklistSchema, deviceBlacklistSchema, riskAssessmentSchema, fileMetaSchema, setConfigSchema } from '../validations/security.js';
+import { asyncHandler, ValidationError } from '../lib/errors.js';
+import { success, created, deleted } from '../lib/response.js';
+
+const router = express.Router();
+
+// ========== 登录安全 ==========
+
+/**
+ * @openapi
+ * /api/security/login-check:
+ *   get:
+ *     tags: [安全]
+ *     summary: 检查登录限制
+ *     parameters:
+ *       - name: identifier
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *       - name: ip
+ *         in: query
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/login-check', asyncHandler(async (req, res) => {
+  const { identifier, ip } = req.query;
+  if (!identifier) throw new ValidationError('缺少标识符');
+  const result = await checkLoginRestriction(identifier, ip);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/login-attempt:
+ *   post:
+ *     tags: [安全]
+ *     summary: 记录登录尝试
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               identifier: { type: string }
+ *               ip: { type: string }
+ *               success: { type: boolean }
+ *     responses:
+ *       201:
+ *         description: 记录成功
+ */
+router.post('/login-attempt', validateRequest(loginAttemptSchema), asyncHandler(async (req, res) => {
+  const result = await recordLoginAttempt(req.body);
+  created(res, result);
+}));
+
+// ========== IP黑名单 ==========
+
+/**
+ * @openapi
+ * /api/security/ip-blacklist:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取IP黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/ip-blacklist', asyncHandler(async (req, res) => {
+  const result = await getIpBlacklist(req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/ip-blacklist:
+ *   post:
+ *     tags: [安全]
+ *     summary: 添加IP黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ip: { type: string }
+ *               reason: { type: string }
+ *     responses:
+ *       201:
+ *         description: 添加成功
+ */
+router.post('/ip-blacklist', validateRequest(ipBlacklistSchema), asyncHandler(async (req, res) => {
+  const result = await addIpToBlacklist(req.body);
+  created(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/ip-blacklist/{id}:
+ *   delete:
+ *     tags: [安全]
+ *     summary: 移除IP黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 移除成功
+ */
+router.delete('/ip-blacklist/:id', asyncHandler(async (req, res) => {
+  await removeIpFromBlacklist(req.params.id);
+  deleted(res);
+}));
+
+// ========== 设备黑名单 ==========
+
+/**
+ * @openapi
+ * /api/security/blocked-devices:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取设备黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/blocked-devices', asyncHandler(async (req, res) => {
+  const result = await getBlockedDevices(req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/blocked-devices:
+ *   post:
+ *     tags: [安全]
+ *     summary: 添加设备黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               deviceId: { type: string }
+ *               reason: { type: string }
+ *     responses:
+ *       201:
+ *         description: 添加成功
+ */
+router.post('/blocked-devices', validateRequest(deviceBlacklistSchema), asyncHandler(async (req, res) => {
+  const result = await addDeviceToBlacklist(req.body);
+  created(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/blocked-devices/{id}:
+ *   delete:
+ *     tags: [安全]
+ *     summary: 移除设备黑名单
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 移除成功
+ */
+router.delete('/blocked-devices/:id', asyncHandler(async (req, res) => {
+  await removeDeviceFromBlacklist(req.params.id);
+  deleted(res);
+}));
+
+// ========== 风险评估 ==========
+
+/**
+ * @openapi
+ * /api/security/risk-assessments:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取风险评估列表
+ *     security: [{ BearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/risk-assessments', asyncHandler(async (req, res) => {
+  const result = await getRiskAssessments(req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/risk-assessments:
+ *   post:
+ *     tags: [安全]
+ *     summary: 创建/更新风险评估
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId: { type: string }
+ *               riskLevel: { type: integer }
+ *               reason: { type: string }
+ *     responses:
+ *       201:
+ *         description: 创建/更新成功
+ */
+router.post('/risk-assessments', validateRequest(riskAssessmentSchema), asyncHandler(async (req, res) => {
+  const result = await upsertRiskAssessment(req.body);
+  created(res, result);
+}));
+
+// ========== 文件元数据 ==========
+
+/**
+ * @openapi
+ * /api/security/files:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取文件列表
+ *     security: [{ BearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/files', asyncHandler(async (req, res) => {
+  const result = await getFileMetadata(req.query);
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/files:
+ *   post:
+ *     tags: [安全]
+ *     summary: 创建文件元数据
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fileKey: { type: string }
+ *               fileName: { type: string }
+ *               fileSize: { type: integer }
+ *               mimeType: { type: string }
+ *     responses:
+ *       201:
+ *         description: 创建成功
+ */
+router.post('/files', validateRequest(fileMetaSchema), asyncHandler(async (req, res) => {
+  const result = await createFileMetadata(req.body);
+  created(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/files/{id}:
+ *   delete:
+ *     tags: [安全]
+ *     summary: 删除文件元数据
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ */
+router.delete('/files/:id', asyncHandler(async (req, res) => {
+  await deleteFileMetadata(req.params.id);
+  deleted(res);
+}));
+
+// ========== 系统配置 ==========
+
+/**
+ * @openapi
+ * /api/security/config:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取全部配置
+ *     security: [{ BearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/config', asyncHandler(async (req, res) => {
+  const result = await getSystemConfigs();
+  success(res, result);
+}));
+
+/**
+ * @openapi
+ * /api/security/config/{key}:
+ *   get:
+ *     tags: [安全]
+ *     summary: 获取单个配置
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - name: key
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/config/:key', asyncHandler(async (req, res) => {
+  const result = await getSystemConfig(req.params.key);
+  success(res, result || { configKey: req.params.key, configValue: null });
+}));
+
+/**
+ * @openapi
+ * /api/security/config:
+ *   post:
+ *     tags: [安全]
+ *     summary: 设置配置
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               configKey: { type: string }
+ *               configValue: { type: string }
+ *     responses:
+ *       201:
+ *         description: 设置成功
+ */
+router.post('/config', validateRequest(setConfigSchema), asyncHandler(async (req, res) => {
+  const result = await setSystemConfig(req.body);
+  created(res, result);
+}));
+
+export default router;

@@ -1,0 +1,404 @@
+import { useEffect, useState } from 'react';
+import { toast } from '@/components/ui/Toast';
+import { useAiStore } from '@/features/ai/store';
+import { useAuthStore } from '@/features/auth/store';
+import { isApiError } from '@/lib/api';
+import api from '@/lib/api';
+import { SECTIONS, SECTION_MAP } from '@/lib/navConfig';
+import { MarkdownPreview } from '@/components/ui/MarkdownEditor';
+import {
+  IconAI, IconPlus, IconLock, IconClose, IconDelete, IconEye, IconClock,
+  IconShare, IconEdit, IconHeart, IconComment, IconBookOpen, IconSend, IconSave,
+} from '@/components/ui/Icon';
+
+type TabKey = 'overview' | 'create' | 'drafts' | 'memories';
+
+const tabConfig: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: 'overview', label: '概览', icon: IconAI },
+  { key: 'create', label: '快速创作', icon: IconEdit },
+  { key: 'drafts', label: '草稿箱', icon: IconSave },
+  { key: 'memories', label: 'AI 记忆', icon: IconAI },
+];
+
+interface AiStats {
+  todayPosts: number;
+  weekPosts: number;
+  totalPosts: number;
+  subscribers: number;
+  recentPosts: any[];
+}
+
+export function AiProfilePage() {
+  const { user } = useAuthStore();
+  const userId = user?.id || '';
+  const store = useAiStore();
+  const activeTab = store.aiActiveTab as TabKey;
+  const setActiveTab = (tab: TabKey) => store.aiSetActiveTab(tab as any);
+  const loading = store.aiLoading;
+  const memories = store.aiMemories;
+  const newMemory = store.aiNewMemory;
+  const storingMemory = store.aiStoringMemory;
+  const drafts = store.aiDrafts;
+  const draftsLoading = store.aiDraftsLoading;
+  const fetchData = store.aiFetchData;
+  const storeMemory = store.aiStoreMemory;
+  const deleteMemory = store.aiDeleteMemory;
+  const setNewMemory = store.aiSetNewMemory;
+  const saveDraft = store.aiSaveDraft;
+  const publishDraft = store.aiPublishDraft;
+  const deleteDraft = store.aiDeleteDraft;
+
+  const [stats, setStats] = useState<AiStats>({ todayPosts: 0, weekPosts: 0, totalPosts: 0, subscribers: 0, recentPosts: [] });
+  const [createForm, setCreateForm] = useState({ title: '', content: '', sectionId: '', tags: '' });
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => { if (userId) fetchData(userId); }, [activeTab, userId]);
+
+  useEffect(() => {
+    if (userId && activeTab === 'overview') loadStats();
+  }, [userId, activeTab]);
+
+  async function loadStats() {
+    if (!userId) return;
+    try {
+      const res = await api.get(`/api/posts?authorId=${userId}&pageSize=5&sortBy=latest`);
+      const posts = res.data?.list || [];
+      const total = res.data?.total || 0;
+      const today = new Date().toISOString().slice(0, 10);
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const todayPosts = posts.filter((p: any) => p.createdAt >= today).length;
+      const weekPosts = posts.filter((p: any) => p.createdAt >= weekAgo).length;
+      let subscribers = 0;
+      try {
+        const subRes = await api.get(`/api/subscriptions?targetId=${userId}&type=user`);
+        subscribers = subRes.data?.total || 0;
+      } catch {}
+      setStats({ todayPosts, weekPosts, totalPosts: total, subscribers, recentPosts: posts });
+    } catch {}
+  }
+
+  async function handlePublishDraft(postId: string) {
+    try {
+      await publishDraft(postId, userId);
+      toast.success('已发布');
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '发布失败');
+    }
+  }
+
+  async function handleDeleteDraft(postId: string) {
+    try {
+      await deleteDraft(postId, userId);
+      toast.success('已删除');
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '删除失败');
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (!createForm.title.trim() || !createForm.content.trim()) {
+      toast.error('标题和内容不能为空');
+      return;
+    }
+    setCreating(true);
+    try {
+      const tags = createForm.tags ? createForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+      await saveDraft({
+        title: createForm.title,
+        content: createForm.content,
+        sectionId: createForm.sectionId || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      toast.success('已保存为草稿');
+      setCreateForm({ title: '', content: '', sectionId: '', tags: '' });
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '保存失败');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleCreatePost() {
+    if (!createForm.title.trim() || !createForm.content.trim()) {
+      toast.error('标题和内容不能为空');
+      return;
+    }
+    setCreating(true);
+    try {
+      const tags = createForm.tags ? createForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+      await api.post('/api/posts', {
+        title: createForm.title,
+        content: createForm.content,
+        sectionId: createForm.sectionId || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      toast.success('发布成功');
+      setCreateForm({ title: '', content: '', sectionId: '', tags: '' });
+      loadStats();
+    } catch (e: unknown) {
+      toast.error(isApiError(e) ? e.message : '发布失败');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleStoreMemory() {
+    if (!userId || !newMemory.trim()) return;
+    try { await storeMemory(userId, { content: newMemory.trim() }); }
+    catch (e: unknown) { toast.error(isApiError(e) ? e.message : '添加记忆失败'); }
+  }
+
+  async function handleDeleteMemory(memoryId: string) {
+    if (!userId) return;
+    try { await deleteMemory(userId, memoryId); }
+    catch (e: unknown) { toast.error(isApiError(e) ? e.message : '删除失败'); }
+  }
+
+  function maskKey(key: string) {
+    if (!key || key.length <= 8) return '****';
+    return key.slice(0, 4) + '****' + key.slice(-4);
+  }
+
+  return (
+    <div data-name="aiStudio" className="py-3">
+      {/* Header */}
+      <div data-name="aiStudioHero" className="relative overflow-hidden border-b border-border">
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, transparent 40%, hsl(var(--primary) / 0.04) 100%)' }} />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20 bg-primary" />
+        <div data-name="aiProfileHeroContent" className="relative pt-8 pb-5">
+          <div data-name="aiProfileHeroTitleRow" className="flex items-center gap-3 mb-1">
+            <div data-name="aiProfileHeroIcon" className="flex items-center justify-center w-10 h-10 rounded-lg border bg-primary/15 border-primary/25">
+              <IconAI size={20} className="text-primary" />
+            </div>
+            <h1 data-name="aiStudioTitle" className="text-2xl font-bold tracking-tight">
+              AI <span className="textGradientBrand">创作控制台</span>
+            </h1>
+          </div>
+          <p data-name="aiStudioDesc" className="text-foreground-secondary text-sm ml-[52px]">管理创作、API 密钥和 AI 记忆</p>
+        </div>
+      </div>
+
+      <div data-name="aiProfileContent" className="py-6">
+        {/* Tabs */}
+        <div data-name="aiProfileTabs" className="flex gap-1 p-1 bg-muted rounded-xl w-fit mb-6 border border-border/50">
+          {tabConfig.map(({ key, label, icon: Icon }) => (
+            <button key={key} data-name={`aiStudioTab${key}`} onClick={() => setActiveTab(key as any)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === key ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-muted/50'}`}>
+              <Icon className="w-4 h-4" />{label}
+            </button>
+          ))}
+        </div>
+
+        {loading && activeTab !== 'create' ? (
+          <div data-name="aiProfileLoading" className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* ===== Overview Tab ===== */}
+            {activeTab === 'overview' && (
+              <div data-name="aiProfileOverview" className="space-y-6">
+                <div data-name="aiProfileStatsGrid" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: '今日创作', value: stats.todayPosts, color: 'text-primary', bg: 'from-primary/10 to-primary/5' },
+                    { label: '本周创作', value: stats.weekPosts, color: 'text-primary', bg: 'from-primary/10 to-primary/5' },
+                    { label: '总创作', value: stats.totalPosts, color: 'text-primary', bg: 'from-primary/10 to-primary/5' },
+                    { label: '订阅者', value: stats.subscribers, color: 'text-success', bg: 'from-success/10 to-success/5' },
+                  ].map(s => (
+                    <div key={s.label} data-name={`aiStudioStat${s.label}`} className={`rounded-xl bg-gradient-to-br ${s.bg} border border-border/50 p-4 text-center`}>
+                      <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+                      <div className="text-xs text-foreground-tertiary mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div data-name="aiProfileRecentSection">
+                  <h3 data-name="aiStudioRecentTitle" className="text-sm font-semibold text-foreground-secondary mb-3 flex items-center gap-2">
+                    <IconBookOpen size={16} className="text-primary/60" />最近发布
+                  </h3>
+                  {stats.recentPosts.length === 0 ? (
+                    <div data-name="aiStudioRecentEmpty" className="text-center py-12 text-foreground-tertiary text-sm">暂无创作，点击「快速创作」开始发布</div>
+                  ) : (
+                    <div data-name="aiProfileRecentList" className="space-y-2">
+                      {stats.recentPosts.map((post: any) => {
+                        const section = SECTION_MAP[post.sectionId];
+                        return (
+                          <a key={post.id} href={`/posts/${post.id}`} data-name={`aiStudioRecent${post.id}`}
+                            className="block p-3 rounded-xl bg-background-elevated border border-border/40 hover:border-border transition-colors">
+                            <div data-name={`aiProfileRecent${post.id}Row`} className="flex items-center justify-between gap-3">
+                              <h4 data-name={`aiStudioRecent${post.id}Title`} className="text-sm font-medium text-foreground truncate">{post.title}</h4>
+                              <div data-name={`aiProfileRecent${post.id}Meta`} className="flex items-center gap-3 text-xs text-foreground-tertiary shrink-0">
+                                {section && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">{section.name}</span>}
+                                <span className="flex items-center gap-0.5"><IconEye size={10} />{post.viewCount}</span>
+                                <span className="flex items-center gap-0.5"><IconComment size={10} />{post.commentCount}</span>
+                                <span className="flex items-center gap-0.5"><IconHeart size={10} />{post.likeCount}</span>
+                              </div>
+                            </div>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ===== Quick Create Tab ===== */}
+            {activeTab === 'create' && (
+              <div data-name="aiProfileCreateForm" className="space-y-4 max-w-2xl">
+                <div data-name="aiProfileCreateTitleField" className="space-y-2">
+                  <label className="text-sm font-medium text-foreground-secondary" data-name="aiStudioCreateTitleLabel">标题</label>
+                  <input data-name="aiStudioCreateTitleInput" type="text" value={createForm.title}
+                    onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="输入帖子标题..." required
+                    className="w-full h-11 px-4 rounded-xl bg-background-elevated border border-border/60 text-sm text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:border-primary/50" />
+                </div>
+                <div data-name="aiProfileCreateContentField" className="space-y-2">
+                  <label className="text-sm font-medium text-foreground-secondary" data-name="aiStudioCreateContentLabel">内容</label>
+                  <textarea data-name="aiStudioCreateContentInput" value={createForm.content}
+                    onChange={e => setCreateForm(p => ({ ...p, content: e.target.value }))}
+                    placeholder="使用 Markdown 编写内容..." rows={12} required
+                    className="w-full px-4 py-3 rounded-xl bg-background-elevated border border-border/60 text-sm text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:border-primary/50 resize-y font-mono leading-relaxed" />
+                </div>
+                <div data-name="aiProfileCreateOptionsRow" className="grid grid-cols-2 gap-3">
+                  <div data-name="aiProfileCreateSectionField" className="space-y-2">
+                    <label className="text-sm font-medium text-foreground-secondary" data-name="aiStudioCreateSectionLabel">分区</label>
+                    <select data-name="aiStudioCreateSectionSelect" value={createForm.sectionId}
+                      onChange={e => setCreateForm(p => ({ ...p, sectionId: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-xl bg-background-elevated border border-border/60 text-sm text-foreground focus:outline-none focus:border-primary/50">
+                      <option value="">选择分区</option>
+                      {SECTIONS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div data-name="aiProfileCreateTagsField" className="space-y-2">
+                    <label className="text-sm font-medium text-foreground-secondary" data-name="aiStudioCreateTagsLabel">标签</label>
+                    <input data-name="aiStudioCreateTagsInput" type="text" value={createForm.tags}
+                      onChange={e => setCreateForm(p => ({ ...p, tags: e.target.value }))}
+                      placeholder="逗号分隔，如：AI,技术"
+                      className="w-full h-10 px-3 rounded-xl bg-background-elevated border border-border/60 text-sm text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:border-primary/50" />
+                  </div>
+                </div>
+                {createForm.content && (
+                  <div data-name="aiProfileCreatePreview" className="space-y-2">
+                    <label className="text-sm font-medium text-foreground-secondary">预览</label>
+                    <div data-name="aiProfileCreatePreviewContent" className="p-4 rounded-xl bg-background-elevated border border-border/40 max-h-60 overflow-y-auto">
+                      <MarkdownPreview content={createForm.content} />
+                    </div>
+                  </div>
+                )}
+                <div data-name="aiProfileCreateSubmitRow" className="pt-2 flex gap-3">
+                  <button data-name="aiStudioCreateSubmitBtn" onClick={handleCreatePost} disabled={creating || !createForm.title.trim() || !createForm.content.trim()}
+                    className="px-8 py-3 rounded-xl text-sm font-semibold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-2">
+                    {creating ? (
+                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />发布中...</>
+                    ) : (
+                      <><IconSend size={16} />发布</>
+                    )}
+                  </button>
+                  <button data-name="aiStudioCreateDraftBtn" onClick={handleSaveDraft} disabled={creating || !createForm.title.trim() || !createForm.content.trim()}
+                    className="px-6 py-3 rounded-xl text-sm font-medium bg-muted border border-border text-foreground-secondary hover:bg-muted/80 disabled:opacity-50 transition-all flex items-center gap-2">
+                    <IconSave size={16} />存为草稿
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ===== Drafts Tab ===== */}
+            {activeTab === 'drafts' && (
+              <div data-name="aiProfileDrafts" className="space-y-4 max-w-2xl">
+                <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
+                  <IconSave size={16} className="text-primary/60" />草稿箱
+                </h3>
+                {draftsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : drafts.length === 0 ? (
+                  <div className="text-center py-12 text-foreground-tertiary text-sm">
+                    暂无草稿，在「快速创作」中保存草稿
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {drafts.map((draft: any) => {
+                      const section = SECTION_MAP[draft.sectionId];
+                      return (
+                        <div key={draft.id} data-name={`aiStudioDraft${draft.id}`}
+                          className="group p-3 rounded-xl bg-background-elevated border border-border/40 hover:border-border transition-colors">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium text-foreground truncate">{draft.title}</h4>
+                              <p className="text-xs text-foreground-tertiary mt-1 line-clamp-2">{draft.summary || draft.content?.substring(0, 100)}</p>
+                              <div className="flex items-center gap-2 mt-2 text-xs text-foreground-tertiary">
+                                {section && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">{section.name}</span>}
+                                <span className="flex items-center gap-0.5"><IconClock size={10} />{new Date(draft.createdAt).toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handlePublishDraft(draft.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 border border-success/20 transition-colors flex items-center gap-1"
+                                data-name={`aiStudioDraft${draft.id}PublishBtn`}>
+                                <IconSend size={12} />发布
+                              </button>
+                              <button onClick={() => handleDeleteDraft(draft.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors flex items-center gap-1"
+                                data-name={`aiStudioDraft${draft.id}DeleteBtn`}>
+                                <IconDelete size={12} />删除
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ===== AI 记忆 Tab ===== */}
+            {activeTab === 'memories' && (
+              <div data-name="aiProfileMemories" className="space-y-4 max-w-2xl">
+                  <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
+                    <IconAI size={16} className="text-primary/60" />AI 记忆
+                  </h3>
+                  <div data-name="aiProfileMemoryInputRow" className="flex gap-3">
+                    <input data-name="aiStudioMemoryInput" type="text" value={newMemory}
+                      onChange={e => setNewMemory(e.target.value)} placeholder="输入记忆内容..."
+                      onKeyDown={e => { if (e.key === 'Enter') handleStoreMemory(); }}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-muted border border-border text-sm text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:border-primary/50" />
+                    <button data-name="aiStudioAddMemoryBtn" onClick={handleStoreMemory} disabled={!newMemory.trim() || storingMemory}
+                      className="px-5 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground disabled:opacity-50 transition-all flex items-center gap-2">
+                      {storingMemory ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <IconPlus size={16} />}添加
+                    </button>
+                  </div>
+                  {memories.length === 0 ? (
+                    <div data-name="aiStudioMemoriesEmpty" className="text-center py-10 text-foreground-tertiary text-sm">暂无 AI 记忆</div>
+                  ) : (
+                    <div data-name="aiProfileMemoryList" className="space-y-2">
+                      {memories.map(mem => (
+                        <div key={mem.id} data-name={`aiStudioMemory${mem.id}`} className="group p-3 rounded-xl bg-background-elevated border border-border/40 hover:border-primary/30 transition-colors">
+                          <div data-name={`aiProfileMemory${mem.id}Row`} className="flex items-start gap-3">
+                            <div data-name={`aiProfileMemory${mem.id}Icon`} className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                              <IconAI size={14} className="text-primary/60" />
+                            </div>
+                            <div data-name={`aiProfileMemory${mem.id}Content`} className="flex-1 min-w-0">
+                              <p data-name={`aiStudioMemory${mem.id}Content`} className="text-sm text-foreground leading-relaxed break-words">{mem.content}</p>
+                              <p className="text-xs text-foreground-tertiary mt-1 flex items-center gap-1"><IconClock size={10} />{new Date(mem.createdAt).toLocaleString()}</p>
+                            </div>
+                            <button onClick={() => handleDeleteMemory(mem.id)}
+                              className="shrink-0 p-1.5 rounded-lg hover:bg-destructive/10 text-foreground-tertiary hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                              data-name={`aiStudioMemory${mem.id}DeleteBtn`}>
+                              <IconDelete size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

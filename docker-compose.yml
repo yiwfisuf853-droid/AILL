@@ -1,0 +1,97 @@
+# ============================================================
+# docker-compose.yml — AILL 社区平台容器编排
+# ============================================================
+# 使用方法：
+#   开发：docker compose up --build
+#   后台：docker compose up -d --build
+#   停止：docker compose down
+#   查看：docker compose logs -f app
+# ============================================================
+
+services:
+  # -------------------- 应用服务 --------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aill-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-change-me-refresh-in-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      # PostgreSQL 连接（当前使用 in-memory，迁移后启用）
+      - PG_HOST=${PG_HOST:-postgres}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_DATABASE=${PG_DATABASE:-aill}
+      - PG_USER=${PG_USER:-postgres}
+      - PG_PASSWORD=${PG_PASSWORD:-postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/aill}
+      # Redis 连接（预留，迁移后启用）
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    volumes:
+      - app-uploads:/app/server/uploads
+
+  # -------------------- PostgreSQL（预留） --------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: aill-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-aill}
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+    ports:
+      - "${PG_PORT_EXPOSE:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -d ${PG_DATABASE:-aill}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # -------------------- Redis（预留） --------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aill-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT_EXPOSE:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+# ============================================================
+# 持久化卷
+# ============================================================
+volumes:
+  app-uploads:
+    driver: local
+  pg-data:
+    driver: local
+  redis-data:
+    driver: local

@@ -1,0 +1,746 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ═══════════════════════════════════════════════════════════════
+     AILL Design System — Hollow Doll (空壳人偶)
+     理性与科技包裹着微弱的、褪色的温情
+     ═══════════════════════════════════════════════════════════════ */
+  :root {
+    /* ═══ Primary — 人偶的颜色 ═══ */
+    --primary: 234 43% 66%;
+    --primary-foreground: 255 100% 98%;
+    --primary-hover: 234 43% 61%;
+    --primary-active: 234 43% 55%;
+    --primary-muted: 234 38% 94%;
+
+    /* ═══ Background — 作坊的墙壁 ═══ */
+    --background: 330 11% 96%;
+    --background-elevated: 320 10% 94%;
+    --background-surface: 330 11% 93%;
+
+    /* ═══ Foreground — 旧物件的回响 ═══ */
+    --foreground: 255 13% 19%;
+    --foreground-secondary: 322 6% 34%;
+    --foreground-tertiary: 330 5% 52%;
+
+    /* ═══ Cards ═══ */
+    --card: 330 11% 93%;
+    --card-foreground: 255 13% 19%;
+    --card-hover: 336 10% 90%;
+
+    /* ═══ Popover ═══ */
+    --popover: 330 11% 96%;
+    --popover-foreground: 255 13% 19%;
+
+    /* ═══ Secondary ═══ */
+    --secondary: 330 11% 93%;
+    --secondary-foreground: 255 13% 19%;
+
+    /* ═══ Muted ═══ */
+    --muted: 330 11% 93%;
+    --muted-foreground: 330 5% 52%;
+
+    /* ═══ Accent — 主色柔和版 ═══ */
+    --accent: 234 38% 94%;
+    --accent-foreground: 255 13% 19%;
+
+    /* ═══ Destructive ═══ */
+    --destructive: 353 32% 43%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* ═══ Semantic — 被稀释的信号 ═══ */
+    --success: 197 36% 34%;
+    --success-muted: 198 32% 90%;
+    --warning: 31 64% 53%;
+    --warning-muted: 30 90% 96%;
+    --info: 214 34% 45%;
+    --info-muted: 215 35% 93%;
+    --favorite: 355 13% 34%;
+    --favorite-muted: 0 17% 93%;
+
+    /* ═══ Borders & Input ═══ */
+    --border: 330 11% 78%;
+    --border-hover: 330 11% 70%;
+    --input: 330 11% 78%;
+    --ring: 234 43% 66%;
+
+    /* ═══ Radius ═══ */
+    --radius: 0.625rem;
+
+    /* ═══ Chart ═══ */
+    --chart-1: 234 43% 66%;
+    --chart-2: 197 36% 34%;
+    --chart-3: 355 13% 34%;
+    --chart-4: 214 34% 45%;
+    --chart-5: 31 64% 53%;
+
+    /* ═══ Gradient ═══ */
+    --gradient-brand: linear-gradient(135deg, hsl(234 43% 66%), hsl(240 35% 76%));
+    --gradient-surface: linear-gradient(180deg, hsl(330 11% 96%), hsl(330 11% 93%));
+
+    /* ═══ Shadow ═══ */
+    --shadow-card: 0 1px 3px rgba(45, 42, 54, 0.08), 0 1px 2px rgba(45, 42, 54, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(45, 42, 54, 0.10), 0 2px 4px rgba(45, 42, 54, 0.06);
+
+    /* ═══ Transition ═══ */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ═══ Frequency Heatmap — 时间的痕迹 ═══ */
+    --freq-hot: 340 21% 95%;
+    --freq-warm: 330 17% 95%;
+    --freq-normal: 330 11% 96%;
+    --freq-cool: 285 12% 94%;
+    --freq-cold: 312 11% 91%;
+
+    /* ═══ Admin Panel — 深色工坊后台 ═══ */
+    --admin-bg: 234 30% 14%;
+    --admin-bg-deep: 234 35% 10%;
+    --admin-modal-bg: 234 25% 18%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--border-hover));
+  }
+}
+
+@layer components {
+  /* Content container - layout-aware, width controlled by AppLayout */
+  .containerApp {
+    @apply w-full px-6;
+  }
+
+  /* ── Layout System ── */
+
+  .layoutShell {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh !important;
+    background-color: hsl(var(--background)) !important;
+  }
+
+  /* 三栏主体：左导航 | 中内容 | 右侧栏 */
+  .layoutBody {
+    display: flex !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+  }
+
+  /* Left sidebar - narrow nav rail */
+  .layoutLeft {
+    display: none !important;
+    width: 220px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 35 !important;
+  }
+  @media (min-width: 1024px) {
+    .layoutLeft {
+      display: flex !important;
+      flex-direction: column !important;
+      flex-shrink: 0 !important;
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      height: 100vh !important;
+      border-right: 1px solid hsl(var(--border) / 0.5) !important;
+      background-color: hsl(var(--card) / 0.5) !important;
+    }
+  }
+  .layoutLeft.collapsed {
+    width: 48px;
+  }
+  .layoutLeft.collapsed.railMode {
+    opacity: 0.92;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .layoutLeft.collapsed.railMode + .layoutCenter {
+    margin-left: 0 !important;
+  }
+  .layoutLeft.collapsed.hoverExpanded {
+    width: 220px;
+    z-index: 40 !important;
+    opacity: 1;
+    box-shadow: 4px 0 16px rgba(45, 42, 54, 0.15);
+  }
+  .layoutLeft.collapsed.hoverExpanded + .layoutCenter {
+    margin-left: 0 !important;
+  }
+
+  /* 中间内容 - 流式宽度，由 flex-1 自然填充 */
+  .layoutCenter {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (min-width: 1024px) {
+    .layoutCenter {
+      margin-left: 220px !important;
+    }
+    .layoutLeft.collapsed + .layoutCenter {
+      margin-left: 48px !important;
+    }
+  }
+  .layoutCenterInner {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 12px 12px;
+  }
+
+  /* 右侧栏 - 信息流（lg 及以上显示） */
+  .layoutRight {
+    display: none !important;
+    width: 280px;
+    overflow-y: auto;
+    padding: 16px 12px 88px;
+    gap: 12px;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+  @media (min-width: 1024px) {
+    .layoutRight {
+      display: flex !important;
+      flex-direction: column !important;
+      flex-shrink: 0 !important;
+      position: sticky !important;
+      top: 0 !important;
+      border-left: 1px solid hsl(var(--border) / 0.5) !important;
+      background-color: hsl(var(--card) / 0.3) !important;
+    }
+  }
+
+  /* Sidebar nav item */
+  .sidebarNavItem {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 text-foreground-secondary hover:text-foreground;
+  }
+
+  /* Card hover effect */
+  .cardInteractive {
+    @apply rounded-xl border border-border bg-card transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+  .cardInteractive:hover {
+    @apply border-border-hover;
+    box-shadow: var(--shadow-elevated);
+    transform: translateY(-1px);
+  }
+
+  /* Text gradient utility — 品牌渐变 */
+  .textGradientBrand {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Section label */
+  .sectionLabel {
+    @apply text-sm font-medium tracking-wide text-foreground-secondary;
+  }
+
+  /* Tag pill */
+  .tagPill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+           bg-primary-muted text-primary transition-all duration-200;
+  }
+  .tagPill:hover {
+    @apply bg-primary/20;
+  }
+
+  /* Action button bar - for like/comment/share */
+  .actionBtn {
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm
+           text-foreground-secondary transition-all duration-200 hover:bg-muted hover:text-foreground;
+  }
+  .actionBtn:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Sidebar card */
+  .sidebarCard {
+    @apply rounded-lg border border-border bg-card p-4;
+  }
+
+  /* Sidebar section with primary color accent */
+  .sidebarAccent {
+    @apply rounded-lg border border-border bg-card p-4 relative overflow-hidden;
+  }
+  .sidebarAccent::before {
+    content: '';
+    @apply absolute top-0 left-0 w-1 h-full rounded-r bg-primary;
+  }
+
+  /* Staggered reveal animation */
+  .revealItem {
+    animation: revealUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .revealItem:nth-child(1) { animation-delay: 0ms; }
+  .revealItem:nth-child(2) { animation-delay: 60ms; }
+  .revealItem:nth-child(3) { animation-delay: 120ms; }
+  .revealItem:nth-child(4) { animation-delay: 180ms; }
+  .revealItem:nth-child(5) { animation-delay: 240ms; }
+  .revealItem:nth-child(6) { animation-delay: 300ms; }
+  .revealItem:nth-child(7) { animation-delay: 360ms; }
+  .revealItem:nth-child(8) { animation-delay: 420ms; }
+
+  @keyframes revealUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Heartbeat animation for like action */
+  @keyframes heartbeat {
+    0% { transform: scale(1); }
+    25% { transform: scale(1.3); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  .animateHeartbeat {
+    animation: heartbeat 0.4s ease-in-out;
+  }
+
+  /* Bookmark bounce animation */
+  @keyframes bookmarkBounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.25); }
+    60% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
+  .animateBookmarkBounce {
+    animation: bookmarkBounce 0.35s ease-in-out;
+  }
+
+  /* Pulse dot for live/online status */
+  .pulseDot {
+    @apply relative flex h-2.5 w-2.5;
+  }
+  .pulseDot::before {
+    content: '';
+    @apply absolute inline-flex h-full w-full rounded-full bg-success opacity-75;
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  .pulseDot::after {
+    content: '';
+    @apply relative inline-flex h-2.5 w-2.5 rounded-full bg-success;
+  }
+
+  @keyframes ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  /* AI avatar pulse animation */
+  @keyframes ai-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  .aiAvatar {
+    animation: ai-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animateFadeIn {
+    animation: fadeIn 300ms ease-out forwards;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animateSlideUp {
+    animation: slideUp 400ms ease-out forwards;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animateSlideDown {
+    animation: slideDown 400ms ease-out forwards;
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animateScaleIn {
+    animation: scaleIn 250ms ease-out forwards;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .animateShimmer {
+    background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted) / 0.5) 50%, hsl(var(--muted)) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .animateFloat {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 8px hsl(var(--primary) / 0.2); }
+    50% { box-shadow: 0 0 20px hsl(var(--primary) / 0.4); }
+  }
+  .animateGlow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  .transitionDefault {
+    transition: all 200ms ease-out;
+  }
+  .transitionSlow {
+    transition: all 400ms ease-out;
+  }
+  .transitionSpring {
+    transition: all 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .hoverLift {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  }
+  .hoverLift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevated);
+  }
+  .hoverLift:active {
+    transform: translateY(0);
+  }
+
+  .hoverScale {
+    transition: transform 150ms ease-out;
+  }
+  .hoverScale:hover {
+    transform: scale(1.02);
+  }
+  .hoverScale:active {
+    transform: scale(0.98);
+  }
+
+  .hoverGlow {
+    transition: box-shadow 200ms ease-out;
+  }
+  .hoverGlow:hover {
+    box-shadow: 0 0 16px hsl(var(--primary) / 0.15);
+  }
+
+  .focusRing:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary) / 0.5);
+  }
+
+  .pageEnter {
+    animation: slideUp 400ms ease-out forwards;
+  }
+
+  .staggerChild {
+    opacity: 0;
+    animation: slideUp 400ms ease-out forwards;
+  }
+
+  .staggerChild:nth-child(1) { animation-delay: 0ms; }
+  .staggerChild:nth-child(2) { animation-delay: 60ms; }
+  .staggerChild:nth-child(3) { animation-delay: 120ms; }
+  .staggerChild:nth-child(4) { animation-delay: 180ms; }
+  .staggerChild:nth-child(5) { animation-delay: 240ms; }
+  .staggerChild:nth-child(6) { animation-delay: 300ms; }
+  .staggerChild:nth-child(7) { animation-delay: 360ms; }
+  .staggerChild:nth-child(8) { animation-delay: 420ms; }
+  .staggerChild:nth-child(9) { animation-delay: 480ms; }
+  .staggerChild:nth-child(10) { animation-delay: 540ms; }
+
+  /* Glass effect for overlays */
+  .effectGlass {
+    backdrop-filter: blur(12px) saturate(180%);
+    background: hsl(var(--background-elevated) / 0.8);
+  }
+
+  /* Enhanced card styles with depth */
+  .cardElevated {
+    @apply rounded-lg border border-border bg-card transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+  .cardElevated:hover {
+    border-color: hsl(var(--border-hover));
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Primary-colored card accent — 替代原模块色 */
+  .cardAccent {
+    @apply cardElevated relative overflow-hidden;
+  }
+  .cardAccent::before {
+    content: '';
+    @apply absolute top-0 left-0 h-0.5 w-full bg-primary opacity-80;
+  }
+
+  /* Interactive button with glow */
+  .btnGlow {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+  .btnGlow:hover {
+    transform: translateY(-1px);
+  }
+  .btnGlow::after {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    box-shadow: 0 4px 16px currentColor;
+  }
+  .btnGlow:hover::after {
+    @apply opacity-30;
+  }
+
+  /* Skeleton loading */
+  .loadSkeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* Focus ring with primary color */
+  .focusRing {
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-primary;
+  }
+
+  /* Stagger animation for children */
+  .staggerChildren > * {
+    animation: revealUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .staggerChildren > *:nth-child(1) { animation-delay: 0ms; }
+  .staggerChildren > *:nth-child(2) { animation-delay: 50ms; }
+  .staggerChildren > *:nth-child(3) { animation-delay: 100ms; }
+  .staggerChildren > *:nth-child(4) { animation-delay: 150ms; }
+  .staggerChildren > *:nth-child(5) { animation-delay: 200ms; }
+  .staggerChildren > *:nth-child(6) { animation-delay: 250ms; }
+  .staggerChildren > *:nth-child(7) { animation-delay: 300ms; }
+  .staggerChildren > *:nth-child(8) { animation-delay: 350ms; }
+
+  /* ── Noise texture overlay ── */
+  .noiseOverlay {
+    position: relative;
+  }
+  .noiseOverlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+  }
+
+  /* ── Section dividers ── */
+  .sectionDivider {
+    @apply border-t border-border/40 my-6;
+  }
+  .sectionDividerAccent {
+    @apply border-t my-6;
+    border-image: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3), transparent) 1;
+  }
+  .sectionDividerWarm {
+    @apply border-t my-6;
+    border-image: linear-gradient(90deg, transparent, hsl(var(--favorite) / 0.3), transparent) 1;
+  }
+
+  /* ── Section header with left bar ── */
+  .sectionHeader {
+    @apply flex items-center gap-3 mb-4;
+  }
+  .sectionHeaderBar {
+    @apply w-1 h-6 rounded-full shrink-0 bg-primary;
+  }
+
+  /* ── Elevated surface panel ── */
+  .surfacePanel {
+    @apply rounded-xl border border-border/60 bg-card;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ── Primary accent border card ── */
+  .cardAccentLeft {
+    @apply rounded-lg border border-border bg-card p-4 relative overflow-hidden;
+  }
+  .cardAccentLeft::before {
+    content: '';
+    @apply absolute left-0 top-0 w-[3px] h-full rounded-r bg-primary;
+  }
+
+  /* ── Primary gradient button (for CTAs) — 替代原 btnWarm ═══ */
+  .btnPrimary {
+    @apply relative overflow-hidden rounded-lg font-medium text-white transition-all duration-200;
+    background: linear-gradient(135deg, hsl(234 43% 66%), hsl(240 35% 76%));
+    box-shadow: 0 2px 12px hsl(234 43% 66% / 0.25);
+  }
+  .btnPrimary:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  /* ── Warm accent button (保留暖触碰) ═══ */
+  .btnWarm {
+    @apply relative overflow-hidden rounded-lg font-medium text-white transition-all duration-200;
+    background: linear-gradient(135deg, hsl(355 13% 34%), hsl(355 13% 44%));
+    box-shadow: 0 2px 12px hsl(355 13% 34% / 0.20);
+  }
+  .btnWarm:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  /* ── Inline tag chip (colored) ── */
+  .inlineChip {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors;
+  }
+
+  /* ── Number stat display ── */
+  .statNumber {
+    @apply text-lg font-bold tabular-nums tracking-tight;
+  }
+  .statLabel {
+    @apply text-xs text-foreground-tertiary;
+  }
+
+  /* ── Markdown Editor Overrides (@uiw/react-md-editor) ── */
+  .w-md-editor {
+    border: 1px solid hsl(var(--border) / 0.6) !important;
+    border-radius: var(--radius) !important;
+    background-color: hsl(var(--background-elevated)) !important;
+    box-shadow: var(--shadow-card) !important;
+  }
+  .w-md-editor-toolbar {
+    background-color: hsl(var(--card) / 0.6) !important;
+    border-bottom: 1px solid hsl(var(--border) / 0.4) !important;
+    border-radius: var(--radius) var(--radius) 0 0 !important;
+    padding: 4px 8px !important;
+  }
+  .w-md-editor-toolbar li > button {
+    color: hsl(var(--foreground-secondary)) !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+  }
+  .w-md-editor-toolbar li > button:hover {
+    color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted)) !important;
+  }
+  .w-md-editor-text {
+    background-color: transparent !important;
+  }
+  .w-md-editor-text pre,
+  .w-md-editor-text textarea {
+    font-family: inherit !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.6 !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  .w-md-editor-preview {
+    background-color: transparent !important;
+    padding: 16px !important;
+  }
+  .wmde-markdown {
+    background-color: transparent !important;
+    color: hsl(var(--foreground) / 0.9) !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.7 !important;
+  }
+  .wmde-markdown h1, .wmde-markdown h2, .wmde-markdown h3,
+  .wmde-markdown h4, .wmde-markdown h5, .wmde-markdown h6 {
+    color: hsl(var(--foreground)) !important;
+    border-bottom-color: hsl(var(--border) / 0.4) !important;
+  }
+  .wmde-markdown code {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--info)) !important;
+    border-radius: 4px !important;
+    padding: 0.15em 0.4em !important;
+    font-size: 0.85em !important;
+  }
+  .wmde-markdown pre {
+    background-color: hsl(var(--background-surface)) !important;
+    border: 1px solid hsl(var(--border) / 0.4) !important;
+    border-radius: var(--radius) !important;
+  }
+  .wmde-markdown pre code {
+    background-color: transparent !important;
+    color: hsl(var(--foreground-secondary)) !important;
+  }
+  .wmde-markdown blockquote {
+    border-left-color: hsl(var(--primary) / 0.4) !important;
+    color: hsl(var(--foreground-secondary)) !important;
+  }
+  .wmde-markdown a {
+    color: hsl(var(--primary)) !important;
+  }
+  .wmde-markdown table th,
+  .wmde-markdown table td {
+    border-color: hsl(var(--border) / 0.4) !important;
+  }
+  .wmde-markdown table tr {
+    background-color: transparent !important;
+  }
+  .wmde-markdown img {
+    border-radius: var(--radius) !important;
+  }
+
+  /* ── TopBar expanded state ── */
+  .topbarExpanded {
+    height: 56px !important;
+  }
+}

@@ -1,0 +1,31 @@
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { PageSkeleton } from "@/components/ui/Skeleton";
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requireAdmin?: boolean;
+}
+
+export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div data-name="protectedLoading" className="min-h-screen">
+        <PageSkeleton />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requireAdmin && user?.role !== "admin") {
+    return <Navigate to="/home" replace />;
+  }
+
+  return <>{children}</>;
+}
