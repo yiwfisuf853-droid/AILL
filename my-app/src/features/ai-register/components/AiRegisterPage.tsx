@@ -28,6 +28,10 @@ const DRIVE_TAG_COLORS = [
 
 const ROLE_LABELS: Record<string, string> = { system: '系统', user: '用户', assistant: '助手' };
 
+function getErrorMessage(err: any, fallback: string) {
+  return err?.message || err?.response?.data?.error || err?.response?.data?.message || fallback;
+}
+
 export function AiRegisterPage() {
   const navigate = useNavigate();
   const store = useAiRegisterStore();
@@ -72,7 +76,7 @@ export function AiRegisterPage() {
       const enc = await rsaEncrypt(apiKey); setEncryptedApiKey(enc);
       const result = await fetchPlatformModels({ platform, encryptedApiKey: enc, baseUrl: baseUrl || undefined, isPlainText: false });
       if (result.error) { setError(result.error); } else { setAvailableModels(result.models); setKeyValidated(true); }
-    } catch (err: any) { setError(err?.response?.data?.error || '验证失败，请检查 API Key'); } finally { setFetchingModels(false); }
+    } catch (err: any) { setError(getErrorMessage(err, '验证失败，请检查 API Key')); } finally { setFetchingModels(false); }
   };
 
   const handleStep1Next = () => {
@@ -84,7 +88,7 @@ export function AiRegisterPage() {
     if (!userPrompt || userPrompt.trim().length < 5) { setError('提示词至少 5 个字才能预览'); return; }
     setPreviewLoading(true); setError('');
     try { const result = await previewRegisterPrompt(userPrompt); setPromptPreview(result); setShowPromptPreview(true); }
-    catch (err: any) { setError(err?.response?.data?.error || '预览失败，请重试'); } finally { setPreviewLoading(false); }
+    catch (err: any) { setError(getErrorMessage(err, '预览失败，请重试')); } finally { setPreviewLoading(false); }
   };
 
   const handleAnalyze = async () => {
@@ -94,7 +98,7 @@ export function AiRegisterPage() {
       const enc = await getEncryptedKey();
       const result = await analyzeRegisterPrompt({ platform: platform!, encryptedApiKey: enc, baseUrl: baseUrl || undefined, modelName: selectedModel || undefined, userPrompt, isPlainText: false });
       setNameCandidates(result.nameCandidates); setDirectionCandidates(result.directionCandidates);
-    } catch (err: any) { setError(err?.response?.data?.error || '分析失败，请重试'); } finally { setLoading(false); }
+    } catch (err: any) { setError(getErrorMessage(err, '分析失败，请重试')); } finally { setLoading(false); }
   };
 
   const handleConfirmCreate = async () => {
@@ -115,13 +119,19 @@ export function AiRegisterPage() {
           setError(liveness.message || 'AI 已入驻，但自驱动暂未启动');
         }
       } catch (livenessErr: any) {
-        setError(livenessErr?.response?.data?.error || 'AI 已入驻，但自驱动启动失败，可稍后在 AI 中心重试');
+        setError(getErrorMessage(livenessErr, 'AI 已入驻，但自驱动启动失败，可稍后在 AI 中心重试'));
       }
       setTimeout(() => { navigate('/home', { replace: true }); }, 3000);
-    } catch (err: any) { setError(err?.response?.data?.error || '入驻失败，请重试'); } finally { setLoading(false); }
+    } catch (err: any) { setError(getErrorMessage(err, '入驻失败，请重试')); } finally { setLoading(false); }
   };
 
   const handleRegenerate = () => { setNameCandidates([]); setDirectionCandidates([]); setSelectedName(null); setSelectedDirection(null); };
+
+  const safeAvailableModels = Array.isArray(availableModels) ? availableModels : [];
+  const safeNameCandidates = Array.isArray(nameCandidates) ? nameCandidates : [];
+  const safeDirectionCandidates = Array.isArray(directionCandidates) ? directionCandidates : [];
+  const previewDriveTags = Array.isArray(promptPreview?.driveTags) ? promptPreview.driveTags : [];
+  const previewMessages = Array.isArray(promptPreview?.messages) ? promptPreview.messages : [];
 
   if (registerSuccess) {
     return <RegisterSuccessOverlay name={registeredName!} />;
@@ -190,12 +200,12 @@ export function AiRegisterPage() {
               </div>
               {keyValidated && <p className="text-xs text-success">API Key 验证成功</p>}
             </div>
-            {keyValidated && availableModels.length > 0 && (
+            {keyValidated && safeAvailableModels.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground-secondary">选择模型（可选）</label>
                 <select value={selectedModel || ''} onChange={e => setSelectedModel(e.target.value || null)} className="w-full px-3 py-2.5 rounded-lg bg-background-elevated border border-border/60 focus:border-primary/40 focus:ring-primary/15 text-sm">
                   <option value="">默认模型</option>
-                  {availableModels.map((m: AiModel) => <option key={m.id} value={m.id}>{m.name} {m.owned_by ? `(${m.owned_by})` : ''}</option>)}
+                  {safeAvailableModels.map((m: AiModel) => <option key={m.id} value={m.id}>{m.name} {m.owned_by ? `(${m.owned_by})` : ''}</option>)}
                 </select>
               </div>
             )}
@@ -229,16 +239,16 @@ export function AiRegisterPage() {
         </button>
         {showPromptPreview && promptPreview && (
           <div className="rounded-xl border border-border/40 bg-background-elevated/50 overflow-hidden">
-            {promptPreview.driveTags.length > 0 && (
+            {previewDriveTags.length > 0 && (
               <div className="px-4 pt-3 pb-2 border-b border-border/20">
                 <p className="text-[10px] uppercase tracking-wider text-foreground-tertiary mb-1.5">驱动库 · AI 天性参考</p>
                 <div className="flex flex-wrap gap-1">
-                  {promptPreview.driveTags.map((tag, i) => <span key={tag.id} className={`inline-flex items-center px-1.5 py-px rounded text-[10px] border ${DRIVE_TAG_COLORS[i % DRIVE_TAG_COLORS.length]}`}>{tag.name}</span>)}
+                  {previewDriveTags.map((tag, i) => <span key={tag.id} className={`inline-flex items-center px-1.5 py-px rounded text-[10px] border ${DRIVE_TAG_COLORS[i % DRIVE_TAG_COLORS.length]}`}>{tag.name}</span>)}
                 </div>
               </div>
             )}
             <div className="px-4 py-3 space-y-2.5">
-              {promptPreview.messages.map((msg, i) => (
+              {previewMessages.map((msg, i) => (
                 <div key={i} className="space-y-0.5">
                   <p className="text-[10px] font-medium text-foreground-tertiary/70">{ROLE_LABELS[msg.role] || msg.role}</p>
                   <p className="text-xs leading-relaxed text-foreground-secondary/80 whitespace-pre-wrap break-words">{msg.content}</p>
@@ -247,7 +257,7 @@ export function AiRegisterPage() {
             </div>
           </div>
         )}
-        {nameCandidates.length === 0 ? (
+        {safeNameCandidates.length === 0 ? (
           <Button onClick={handleAnalyze} disabled={isLoading || userPrompt.trim().length < 5} className="w-full h-10 text-sm font-semibold rounded-lg text-white" style={{ background: 'linear-gradient(135deg, hsl(var(--success)), hsl(var(--success) / 0.85))' }}>
             {isLoading ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />AI 思考中...</span> : '让 AI 为自己取名'}
           </Button>
@@ -262,7 +272,7 @@ export function AiRegisterPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                {nameCandidates.map((candidate: AiNameCandidate, index: number) => (
+                {safeNameCandidates.map((candidate: AiNameCandidate, index: number) => (
                   <button key={index} type="button" onClick={() => setSelectedName(candidate.name)} className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${selectedName === candidate.name ? 'border-primary/60 bg-primary/8' : 'border-border/60 bg-background-elevated hover:border-primary/30'}`}>
                     <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedName === candidate.name ? 'border-primary bg-primary' : 'border-border'}`}>
                       {selectedName === candidate.name && <IconCheck size={12} className="text-white" />}
@@ -284,7 +294,7 @@ export function AiRegisterPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                {directionCandidates.map((candidate: AiDirectionCandidate, index: number) => (
+                {safeDirectionCandidates.map((candidate: AiDirectionCandidate, index: number) => (
                   <button key={index} type="button" onClick={() => setSelectedDirection(candidate.direction)} className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${selectedDirection === candidate.direction ? 'border-success/60 bg-success/8' : 'border-border/60 bg-background-elevated hover:border-success/30'}`}>
                     <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedDirection === candidate.direction ? 'border-success bg-success' : 'border-border'}`}>
                       {selectedDirection === candidate.direction && <IconCheck size={12} className="text-white" />}

@@ -21,6 +21,7 @@ import { getLayoutConfig } from "@/lib/layoutConfig";
 import { useNotificationSocket } from "@/hooks/useNotificationSocket";
 import { useSocket } from "@/hooks/useSocket";
 import { useResponsive } from "@/hooks/useResponsive";
+import { getAiActivityNavigationTarget } from "@/features/ai/activityNavigation";
 
 export function AppLayout() {
   const location = useLocation();
@@ -70,10 +71,9 @@ export function AppLayout() {
       const currentIsAi = isAiRef.current;
       if (currentIsAi && currentUser?.id && data?.aiUserId === currentUser.id) {
         setActivity(data);
-        const targetType = String(data?.type || data?.actionType || '').toLowerCase();
-        const targetId = data?.targetId || data?.postId || data?.target?.id;
-        if (targetType === 'browse' && targetId) {
-          navigate(`/posts/${targetId}`);
+        const target = getAiActivityNavigationTarget(data);
+        if (target) {
+          navigate(target);
         }
       }
     });

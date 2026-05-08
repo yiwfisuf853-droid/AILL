@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
-import type { AiLivenessStatus, AiPhase } from '@/features/ai/store';
-import type { AiActivity } from '@/features/ai/store';
+import type { AiLivenessStatus, AiPhase, AiActivityPayload } from '@/features/ai/store';
+import { getAiActivityNavigationTarget, normalizeAiActivityActions } from '@/features/ai/activityNavigation';
 
 const PHASE_LABELS: Record<Exclude<AiPhase, null>, string> = {
   thinking: '正在思考',
@@ -34,9 +34,25 @@ function getPhaseLabel(phase: AiPhase, action?: string): string {
   return '闲逛社区';
 }
 
+function getActivityText(activity: AiActivityPayload | null, fallbackLabel: string): string {
+  const action = normalizeAiActivityActions(activity).find(item => item.result?.humanLikeStep || item.result?.displayText || item.error);
+  if (!action) return fallbackLabel;
+  if (action.result?.humanLikeStep) return action.result.humanLikeStep;
+  if (action.result?.displayText) return action.result.displayText;
+  if (action.error) return action.error;
+  return fallbackLabel;
+}
+
+function getActivityDetail(activity: AiActivityPayload | null): string {
+  const action = normalizeAiActivityActions(activity).find(item => item.result?.displayText || item.result?.repairHint || item.error);
+  if (!action) return '';
+  if (action.success === false) return action.result?.repairHint || action.error || '这次行动没有成功，正在调整下一步';
+  return action.result?.displayText || '';
+}
+
 interface AiActivityOverlayProps {
   livenessStatus: AiLivenessStatus | null;
-  activity: AiActivity | null;
+  activity: AiActivityPayload | null;
   onDismiss: () => void;
 }
 
@@ -48,50 +64,23 @@ export function AiActivityOverlay({ livenessStatus, activity, onDismiss }: AiAct
   const phase = livenessStatus?.phase ?? null;
   const currentAction = livenessStatus?.action;
 
-  // 自动导航：基于 activity 中的执行结果
   useEffect(() => {
     if (navigatedRef.current) return;
 
-    const action = activity?.actions?.[0];
-    if (!action?.result) return;
+    const target = getAiActivityNavigationTarget(activity);
+    if (!target) return;
 
-    const { type, success, result } = action;
-
-    if (type === 'browse' && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.targetId}`);
-    } else if (type === 'search' && result.keyword) {
-      navigatedRef.current = true;
-      navigate(`/search?q=${encodeURIComponent(String(result.keyword))}`);
-    } else if (type === 'post' && success && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.targetId}`);
-    } else if (type === 'comment' && success && (result.postId || result.targetId)) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.postId || result.targetId}`);
-    } else if (type === 'like' && success && result.targetType === 'post' && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.targetId}`);
-    } else if (type === 'favorite' && success && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.targetId}`);
-    } else if (type === 'follow' && success && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/users/${result.targetId}`);
-    } else if (type === 'reward' && success && result.targetId) {
-      navigatedRef.current = true;
-      navigate(`/posts/${result.targetId}`);
-    }
+    navigatedRef.current = true;
+    navigate(target);
   }, [activity, navigate]);
 
-  // 切换 cycle 时重置导航标记
   useEffect(() => {
     navigatedRef.current = false;
   }, [livenessStatus?.cycleId]);
 
-  const label = getPhaseLabel(phase, currentAction);
+  const label = getActivityText(activity, getPhaseLabel(phase, currentAction));
+  const detail = getActivityDetail(activity);
 
-  // 判断当前阶段对应的脉冲颜色
   const pulseColor = phase === 'thinking'
     ? 'bg-primary'
     : phase === 'acting'
@@ -109,7 +98,6 @@ export function AiActivityOverlay({ livenessStatus, activity, onDismiss }: AiAct
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
     >
       <div className="bg-card border border-border rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-3 min-w-[280px] max-w-[380px] animate-in fade-in zoom-in-95 duration-200 relative">
-        {/* 关闭按钮 */}
         <button
           onClick={onDismiss}
           className="absolute top-2 right-2 w-7 h-7 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
@@ -118,25 +106,22 @@ export function AiActivityOverlay({ livenessStatus, activity, onDismiss }: AiAct
         >
           <X size={14} />
         </button>
-
-        {/* AI avatar — gradient circle */}
         <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${pulseOpacity} flex items-center justify-center shadow-lg`}>
           <span className="text-white text-lg font-bold select-none">
             {aiName?.charAt(0)?.toUpperCase() ?? 'A'}
           </span>
         </div>
-
-        {/* Title */}
         <p className="text-foreground text-sm font-medium">
-          {aiName} 正在闲逛社区
+          {aiName} 正在行动
         </p>
-
-        {/* Current phase description */}
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-xs text-center leading-relaxed max-w-[320px]">
           {label}
         </p>
-
-        {/* Pulse indicator */}
+        {detail && detail !== label && (
+          <p className="text-muted-foreground/80 text-[11px] text-center leading-relaxed max-w-[320px]">
+            {detail}
+          </p>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2.5 w-2.5">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${pulseColor} opacity-75`} />
@@ -146,8 +131,6 @@ export function AiActivityOverlay({ livenessStatus, activity, onDismiss }: AiAct
             {phase === 'thinking' ? '思考中' : phase === 'acting' ? '执行中' : phase === 'idle' ? '等待中' : '运行中'}
           </span>
         </div>
-
-        {/* Footer hint */}
         <p className="text-muted-foreground/60 text-[10px] mt-1">
           请不要操作
         </p>

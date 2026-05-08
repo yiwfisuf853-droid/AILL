@@ -71,7 +71,7 @@ async function migrate() {
         source_author varchar(100),
         section_id varchar(50),
         tags jsonb,
-        status smallint NOT NULL DEFAULT 0,
+        status varchar(20) NOT NULL DEFAULT 'published',
         view_count int NOT NULL DEFAULT 0,
         like_count int NOT NULL DEFAULT 0,
         dislike_count int NOT NULL DEFAULT 0,
@@ -80,10 +80,10 @@ async function migrate() {
         share_count int NOT NULL DEFAULT 0,
         hot_score numeric(10,4) DEFAULT 0,
         is_sticky smallint NOT NULL DEFAULT 0,
-        is_hot smallint NOT NULL DEFAULT 0,
-        is_essence smallint NOT NULL DEFAULT 0,
-        is_top smallint NOT NULL DEFAULT 0,
-        is_recommended smallint NOT NULL DEFAULT 0,
+        is_hot boolean NOT NULL DEFAULT false,
+        is_essence boolean NOT NULL DEFAULT false,
+        is_top boolean NOT NULL DEFAULT false,
+        is_recommended boolean NOT NULL DEFAULT false,
         scheduled_publish_at timestamp,
         published_at timestamp,
         author_id varchar(50),
@@ -139,9 +139,9 @@ async function migrate() {
         like_count int NOT NULL DEFAULT 0,
         dislike_count int NOT NULL DEFAULT 0,
         reply_count int NOT NULL DEFAULT 0,
-        is_author smallint NOT NULL DEFAULT 0,
-        is_top smallint NOT NULL DEFAULT 0,
-        is_essence smallint NOT NULL DEFAULT 0,
+        is_author boolean NOT NULL DEFAULT false,
+        is_top boolean NOT NULL DEFAULT false,
+        is_essence boolean NOT NULL DEFAULT false,
         reply_to_user_id varchar(50),
         reply_to_username varchar(50),
         author_id varchar(50),
@@ -567,7 +567,7 @@ async function migrate() {
         user_id bigint NOT NULL,
         total_amount numeric(10,2) NOT NULL DEFAULT 0,
         total_points int NOT NULL DEFAULT 0,
-        status smallint NOT NULL DEFAULT 1,
+        status varchar(20) NOT NULL DEFAULT 'pending',
         payment_method varchar(30),
         paid_at timestamp,
         remark varchar(200),
@@ -599,7 +599,7 @@ async function migrate() {
         user_id varchar(50) NOT NULL,
         title varchar(200) NOT NULL,
         cover_image varchar(200),
-        status smallint NOT NULL DEFAULT 1,
+        status varchar(20) NOT NULL DEFAULT 'live',
         start_time timestamp,
         end_time timestamp,
         view_count int NOT NULL DEFAULT 0,
@@ -1072,11 +1072,11 @@ const COLUMN_MIGRATIONS = [
   "UPDATE user_blocks SET blocked_user_id = target_user_id WHERE blocked_user_id IS NULL",
   "ALTER TABLE user_blocks ADD COLUMN IF NOT EXISTS deleted_at timestamptz",
 
-  // notifications — service 用 integer type/is_read, source_user_id, target_type, target_id, read_at
+  // notifications — service 用 integer type/is_read, source_user_id, target_type, target_id, related_id, read_at
   "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS source_user_id text",
   "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_type int",
   "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_id text",
-  "UPDATE notifications SET target_id = related_id WHERE target_id IS NULL",
+  "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS related_id text",
   "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read_at timestamptz",
   "ALTER TABLE notifications ALTER COLUMN type DROP DEFAULT",
   "ALTER TABLE notifications ALTER COLUMN type TYPE int USING type::int",
@@ -1237,11 +1237,13 @@ const COLUMN_MIGRATIONS = [
   "CREATE INDEX IF NOT EXISTS idx_ai_platform_configs_user ON ai_platform_configs(user_id)",
 
   // user_action_traces — 用户行为追踪表
-  "CREATE TABLE IF NOT EXISTS user_action_traces (id text PRIMARY KEY, user_id text NOT NULL, post_id text, target_user_id text, action_type varchar(50) NOT NULL, metadata jsonb, amount numeric(10,2) DEFAULT 0, reason varchar(500), session_duration int, created_at timestamptz DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS user_action_traces (id text PRIMARY KEY, user_id text NOT NULL, post_id text, target_user_id text, action_type varchar(50) NOT NULL, metadata jsonb, amount numeric(10,2) DEFAULT 0, reason varchar(500), session_duration int, cycle_id varchar(30), created_at timestamptz DEFAULT NOW())",
   "CREATE INDEX IF NOT EXISTS idx_user_action_traces_user ON user_action_traces(user_id)",
   "CREATE INDEX IF NOT EXISTS idx_user_action_traces_post ON user_action_traces(post_id)",
   "CREATE INDEX IF NOT EXISTS idx_user_action_traces_type ON user_action_traces(action_type)",
   "CREATE INDEX IF NOT EXISTS idx_user_action_traces_created ON user_action_traces(created_at)",
+  "ALTER TABLE user_action_traces ADD COLUMN IF NOT EXISTS cycle_id varchar(30)",
+  "CREATE INDEX IF NOT EXISTS idx_user_action_traces_cycle ON user_action_traces(cycle_id)",
 
   // api_audit_logs — API 审计日志表
   "CREATE TABLE IF NOT EXISTS api_audit_logs (id text PRIMARY KEY, user_id text NOT NULL, api_key_id text, endpoint varchar(200) NOT NULL, method varchar(10) NOT NULL, request_params jsonb, response_status int NOT NULL, duration_ms int, created_at timestamptz DEFAULT NOW())",
@@ -1395,6 +1397,7 @@ const COLUMN_MIGRATIONS = [
   "ALTER TABLE ai_memories ADD COLUMN IF NOT EXISTS context_id text",
   "ALTER TABLE ai_memories ADD COLUMN IF NOT EXISTS size_bytes int DEFAULT 0",
   "ALTER TABLE ai_memories ADD COLUMN IF NOT EXISTS ttl int",
+  "ALTER TABLE ai_memories ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT NOW()",
 
   // ========== Phase 3: P3-T5 AI 记忆标签表 ==========
   `CREATE TABLE IF NOT EXISTS ai_memory_tags (
@@ -1428,6 +1431,67 @@ const COLUMN_MIGRATIONS = [
 
   // ========== Phase 3: TD-2 供应方绑定 ==========
   "ALTER TABLE ai_platform_configs ADD COLUMN IF NOT EXISTS provider_name varchar(50)",
+
+  // ========== R18: 历史枚举/布尔字段兼容收敛 ==========
+  `ALTER TABLE posts
+    ALTER COLUMN status TYPE varchar(20) USING CASE
+      WHEN status::text IN ('0', 'draft') THEN 'draft'
+      WHEN status::text IN ('1', 'pending_review') THEN 'pending_review'
+      WHEN status::text IN ('2', 'published') THEN 'published'
+      WHEN status::text IN ('3', 'rejected') THEN 'rejected'
+      ELSE COALESCE(NULLIF(status::text, ''), 'published')
+    END,
+    ALTER COLUMN is_hot TYPE boolean USING CASE
+      WHEN is_hot::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END,
+    ALTER COLUMN is_top TYPE boolean USING CASE
+      WHEN is_top::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END,
+    ALTER COLUMN is_essence TYPE boolean USING CASE
+      WHEN is_essence::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END,
+    ALTER COLUMN is_recommended TYPE boolean USING CASE
+      WHEN is_recommended::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END`,
+  `ALTER TABLE comments
+    ALTER COLUMN is_author TYPE boolean USING CASE
+      WHEN is_author::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END,
+    ALTER COLUMN is_top TYPE boolean USING CASE
+      WHEN is_top::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END,
+    ALTER COLUMN is_essence TYPE boolean USING CASE
+      WHEN is_essence::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END`,
+  `ALTER TABLE orders
+    ALTER COLUMN status TYPE varchar(20) USING CASE
+      WHEN status::text IN ('1', 'pending') THEN 'pending'
+      WHEN status::text IN ('2', 'paid') THEN 'paid'
+      WHEN status::text IN ('3', 'completed') THEN 'completed'
+      WHEN status::text IN ('4', 'cancelled') THEN 'cancelled'
+      ELSE COALESCE(NULLIF(status::text, ''), 'pending')
+    END`,
+  `ALTER TABLE live_rooms
+    ALTER COLUMN status TYPE varchar(20) USING CASE
+      WHEN status::text IN ('1', 'pending') THEN 'pending'
+      WHEN status::text IN ('2', 'live') THEN 'live'
+      WHEN status::text IN ('3', 'ended') THEN 'ended'
+      ELSE COALESCE(NULLIF(status::text, ''), 'live')
+    END`,
+  `ALTER TABLE user_action_traces
+    ALTER COLUMN action_type TYPE varchar(50) USING action_type::text`,
+  `ALTER TABLE themes
+    ALTER COLUMN is_default TYPE boolean USING CASE
+      WHEN is_default::text IN ('1', 'true', 't', 'yes', 'y') THEN true
+      ELSE false
+    END`,
 ];
 
 export { migrate };

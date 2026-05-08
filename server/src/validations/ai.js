@@ -65,7 +65,7 @@ export const updateFervorSchema = {
 
 export const aiRenameSchema = {
   body: z.object({
-    newName: z.string().min(5, 'AI 名字至少 5 个字符').max(30, '名字最长 30 字符'),
+    newName: z.string().min(5, 'AI 名字至少 5 个字符').max(50, '名字最长 50 字符'),
   }),
 };
 

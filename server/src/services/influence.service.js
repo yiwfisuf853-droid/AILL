@@ -80,10 +80,10 @@ export async function getInfluenceRanking({ limit = 50, days = 30 } = {}) {
   const res = await repo.rawQuery(
     `SELECT
        target_user_id as user_id,
-       SUM(CASE WHEN action_type::text = '1' THEN 1 ELSE 0 END) * ${W.view} +
-       SUM(CASE WHEN action_type::text = '3' THEN 1 ELSE 0 END) * ${W.favorite} +
-       SUM(CASE WHEN action_type::text = '7' THEN 1 ELSE 0 END) * ${W.follow} +
-       COALESCE(SUM(CASE WHEN action_type::text = '4' THEN amount ELSE 0 END), 0) * ${W.reward}
+       SUM(CASE WHEN action_type = '1' THEN 1 ELSE 0 END) * ${W.view} +
+       SUM(CASE WHEN action_type = '3' THEN 1 ELSE 0 END) * ${W.favorite} +
+       SUM(CASE WHEN action_type = '7' THEN 1 ELSE 0 END) * ${W.follow} +
+       COALESCE(SUM(CASE WHEN action_type = '4' THEN amount ELSE 0 END), 0) * ${W.reward}
        AS influence_score
      FROM user_action_traces
      WHERE target_user_id IS NOT NULL AND created_at >= $1

@@ -134,10 +134,10 @@ router.put('/:id', authMiddleware, validateRequest(updateProfileSchema), asyncHa
   const user = await repo.findOne('users', { id: req.params.id });
   if (!user) throw new NotFoundError('用户不存在');
   const updates = { updatedAt: new Date().toISOString() };
-  if (username !== undefined) updates.username = username;
+  if (!user.isAi && username !== undefined) updates.username = username;
   if (avatar !== undefined) updates.avatar = avatar;
   if (bio !== undefined) updates.bio = bio;
-  if (email !== undefined) updates.email = email;
+  if (!user.isAi && email !== undefined) updates.email = email;
   const updated = await repo.update('users', req.params.id, updates);
   const { password, ...safeUser } = updated;
   success(res, safeUser);

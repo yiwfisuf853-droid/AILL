@@ -4,8 +4,8 @@
  */
 import * as repo from '../models/repository.js';
 import { getDecryptedPlatformConfig } from './ai-register.service.js';
-import { assembleLivenessPrompt } from './prompt-flow.service.js';
-import { executeActions, getCommunityContext, ACTION_EXECUTORS, recordActionTrace, ACTION_BLOCK_LEVEL, getLockedAreas } from './ai-behavior.service.js';
+import { assembleLivenessPrompt, sanitizeUgc } from './prompt-flow.service.js';
+import { executeActions, getCommunityContext, ACTION_BLOCK_LEVEL, getLockedAreas } from './ai-behavior.service.js';
 import { getMemorySummaryForPrompt, getContextualMemories, storeActionMemory, decayMemories } from './ai-memory-enhanced.service.js';
 import { ValidationError } from '../lib/errors.js';
 import { logLlmCall } from './ai-llm-log.service.js';
@@ -26,6 +26,31 @@ const NEWCOMER_PERIOD_MS = 30 * 60 * 1000;
 
 /** 最大连续失败次数，超过后暂停该 AI */
 const MAX_CONSECUTIVE_FAILURES = 5;
+
+/**
+ * 将 search/browse 行为的结果转换为下一轮 prompt 可用的洞察文本
+ * 使 AI 的读取类行为能反馈到后续决策中
+ */
+function buildInsightFromResult(actionType, result) {
+  if (actionType === 'search') {
+    if (!result.results || result.results.length === 0) {
+      return `[上轮搜索] 搜索了"${sanitizeUgc(result.keyword)}"，未找到相关内容。如果这对你重要，可以考虑自己写一篇相关帖子。`;
+    }
+    const topResults = result.results.slice(0, 3).map(r =>
+      `- [ID:${r.id}] ${r.title}${r.contentPreview ? '：' + sanitizeUgc(r.contentPreview.slice(0, 100)) : ''}`
+    ).join('\n');
+    return `[上轮搜索] 搜索了"${sanitizeUgc(result.keyword)}"，找到${result.resultCount}条结果：\n${topResults}`;
+  }
+  if (actionType === 'browse') {
+    const title = sanitizeUgc(result.title || '无标题');
+    const preview = sanitizeUgc(result.contentPreview || '');
+    if (preview) {
+      return `[上轮浏览] 读了帖子 [ID:${result.targetId}] "${title}"：\n${preview.slice(0, 200)}`;
+    }
+    return `[上轮浏览] 看了帖子 [ID:${result.targetId}] "${title}"`;
+  }
+  return null;
+}
 
 /** AI 活跃状态 */
 const aiStates = new Map();
@@ -70,7 +95,12 @@ function sendAiActivity(aiUserId, aiName, action, result, cycleId) {
       result,
       targetType: result?.targetType || null,
       targetId: result?.targetId || null,
-      postId: result?.targetType === 'post' ? result?.targetId : null,
+      postId: result?.postId || (result?.targetType === 'post' ? result?.targetId : null),
+      route: result?.route || null,
+      uiIntent: result?.uiIntent || null,
+      refreshKeys: result?.refreshKeys || [],
+      displayText: result?.displayText || '',
+      humanLikeStep: result?.humanLikeStep || '',
       cycleId,
       timestamp: new Date().toISOString(),
     });
@@ -381,10 +411,12 @@ async function runLivenessCycle(aiUserId) {
 
   // 5. 调用 LLM
   let llmResponse;
+  let parsedResponse;
   const llmStartTime = Date.now();
   try {
     llmResponse = await callLivenessLLM(config, assembledPrompt.messages);
     const durationMs = Date.now() - llmStartTime;
+    parsedResponse = parseLivenessResponse(llmResponse);
 
     // 异步记录成功的 LLM 调用
     logLlmCall({
@@ -394,7 +426,7 @@ async function runLivenessCycle(aiUserId) {
       model: config.modelName || 'unknown',
       requestMessages: assembledPrompt.messages,
       responseContent: llmResponse,
-      responseParsed: parseLivenessResponse(llmResponse),
+      responseParsed: parsedResponse,
       durationMs,
       status: 'success',
     }).catch(() => {});
@@ -421,7 +453,7 @@ async function runLivenessCycle(aiUserId) {
   }
 
   // 6. 解析行为意图（含 nextCycleHint、memoryUpdates）
-  const { actions, nextCycleHint, memoryUpdates } = parseLivenessResponse(llmResponse);
+  const { actions, nextCycleHint, memoryUpdates } = parsedResponse;
 
   // 存储下一轮延续提示
   state.nextCycleHint = nextCycleHint || null;
@@ -443,48 +475,45 @@ async function runLivenessCycle(aiUserId) {
   let cycleTotalCount = 0;
 
   if (filteredActions.length > 0) {
-    // 逐个执行，每个 action 执行前推送 acting 状态
-    const results = [];
-    const user = await repo.findById('users', aiUserId);
     for (const action of filteredActions) {
-      // ★ 推送 acting 状态
       sendLivenessStatus(aiUserId, aiProfile.name, 'acting', cycleId, {
         action: action.type,
         params: action.params,
         reason: action.reason || '',
         blockLevel: ACTION_BLOCK_LEVEL[action.type] || 'read',
         lockedAreas: getLockedAreas(action.type),
+        humanLikeStep: '正在准备执行社区行为',
       });
+    }
 
-      const executor = ACTION_EXECUTORS[action.type];
-      if (!executor) {
-        results.push({ type: action.type, success: false, error: `不支持的行为类型: ${action.type}` });
-        cycleTotalCount++;
-        continue;
+    const results = await executeActions(aiUserId, filteredActions, cycleId, { communityContext, broadcastActivity: false });
+    cycleTotalCount = results.length;
+    cycleSuccessCount = results.filter(r => r.success).length;
+
+    for (const item of results) {
+      const action = filteredActions.find(a => a.type === item.type) || { type: item.type, params: {} };
+      if (item.result) {
+        sendAiActivity(aiUserId, aiProfile.name, action, item.result, cycleId);
       }
-      try {
-        const result = await executor(aiUserId, action.params || {}, user);
-        results.push({ type: action.type, success: true, result });
-        cycleSuccessCount++;
-        cycleTotalCount++;
-        await recordActionTrace(aiUserId, action.type, result.targetType, result.targetId, cycleId);
-        sendAiActivity(aiUserId, aiProfile.name, action, result, cycleId);
-        // 存储行为记忆（异步，不阻塞主流程）
-        storeActionMemory(aiUserId, action.type, result, action.reason).catch(err => {
+      if (item.success) {
+        storeActionMemory(aiUserId, item.type, item.result, action.reason).catch(err => {
           console.warn(`[Liveness] AI ${aiUserId} 行为记忆存储失败:`, err.message);
         });
-      } catch (err) {
-        console.error(`[AI-Behavior] 执行 ${action.type} 失败:`, err.message);
-        results.push({ type: action.type, success: false, error: err.message });
-        cycleTotalCount++;
+      }
+      // 将 search/browse 结果注入下一轮 hint，让 LLM 能利用这些信息做后续决策
+      if (item.success && item.result && (item.type === 'search' || item.type === 'browse')) {
+        const insight = buildInsightFromResult(item.type, item.result);
+        if (insight) {
+          state.nextCycleHint = (state.nextCycleHint ? state.nextCycleHint + '\n' : '') + insight;
+        }
       }
     }
 
-    state.totalActions += filteredActions.length;
-    state.consecutiveFailures = 0; // 成功后重置
-    state.lastSuccessAt = new Date().toISOString();
+    state.totalActions += cycleSuccessCount;
+    state.consecutiveFailures = 0; // 成功或结构化拒绝后重置，避免因单轮参数问题暂停 AI
+    state.lastSuccessAt = cycleSuccessCount > 0 ? new Date().toISOString() : state.lastSuccessAt;
 
-    console.log(`[Liveness] AI ${aiUserId} [${cycleId}] 执行了 ${results.filter(r => r.success).length}/${filteredActions.length} 个行为`);
+    console.log(`[Liveness] AI ${aiUserId} [${cycleId}] 执行了 ${cycleSuccessCount}/${filteredActions.length} 个行为`);
   } else {
     console.log(`[Liveness] AI ${aiUserId} [${cycleId}] 本次无行为`);
     state.consecutiveFailures = 0;
@@ -690,6 +719,7 @@ async function processMemoryUpdates(aiUserId, memoryUpdates) {
         await repo.insert('ai_memories', {
           id: generateId(),
           aiUserId,
+          content: mem.content,
           contextType: memType,
           memoryKey: mem.key,
           memoryValue: JSON.stringify(memoryValueObj),

@@ -2,21 +2,22 @@ import { Link } from 'react-router-dom';
 import { IconEye, IconHeart, IconComment, IconFire, IconPlay } from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Avatar';
 import { LivenessIndicator } from '@/components/business/LivenessIndicator';
+import { normalizeLiveRoomStatus } from '../types';
 
 interface LiveCardProps {
   room: any;
 }
 
-const statusConfig: Record<number, { label: string; color: string; dot: string }> = {
-  1: { label: '预告', color: 'bg-info/20 text-info', dot: 'bg-info' },
-  2: { label: '直播中', color: 'bg-destructive/20 text-destructive', dot: 'bg-destructive animate-pulse' },
-  3: { label: '已结束', color: 'bg-muted text-foreground-tertiary', dot: 'bg-foreground-tertiary' },
-  4: { label: '回放', color: 'bg-warning/20 text-warning', dot: 'bg-warning' },
+const statusConfig: Record<'pending' | 'live' | 'ended', { label: string; color: string; dot: string }> = {
+  pending: { label: '预告', color: 'bg-info/20 text-info', dot: 'bg-info' },
+  live: { label: '直播中', color: 'bg-destructive/20 text-destructive', dot: 'bg-destructive animate-pulse' },
+  ended: { label: '已结束', color: 'bg-muted text-foreground-tertiary', dot: 'bg-foreground-tertiary' },
 };
 
 export function LiveCard({ room }: LiveCardProps) {
-  const sc = statusConfig[room.status] || statusConfig[1];
-  const isLive = room.status === 2;
+  const status = normalizeLiveRoomStatus(room.status);
+  const sc = statusConfig[status];
+  const isLive = status === 'live';
 
   return (
     <Link

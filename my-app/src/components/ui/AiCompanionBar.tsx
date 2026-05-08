@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Moon, ChevronDown, ChevronUp } from 'lucide-react';
-import type { AiLivenessStatus, AiPhase, CycleSummary } from '@/features/ai/store';
-import type { AiActivity } from '@/features/ai/store';
+import type { AiLivenessStatus, AiPhase, CycleSummary, AiActivityPayload } from '@/features/ai/store';
+import { getAiActivityNavigationTarget, normalizeAiActivityActions } from '@/features/ai/activityNavigation';
 
 const PHASE_LABELS: Record<Exclude<AiPhase, null>, string> = {
   thinking: '思考中',
@@ -30,9 +30,22 @@ const ACTION_EMOJI: Record<string, string> = {
   browse: '👀', settings: '⚙️', rename: '✨',
 };
 
+function getLatestAction(activity: AiActivityPayload | null) {
+  return normalizeAiActivityActions(activity).find(item => item.result?.humanLikeStep || item.result?.displayText || item.error) || null;
+}
+
+function getActionCopy(activity: AiActivityPayload | null, fallback: string): string {
+  const action = getLatestAction(activity);
+  if (!action) return fallback;
+  if (action.result?.humanLikeStep) return action.result.humanLikeStep;
+  if (action.result?.displayText) return action.result.displayText;
+  if (action.error) return action.error;
+  return fallback;
+}
+
 interface AiCompanionBarProps {
   livenessStatus: AiLivenessStatus | null;
-  activity: AiActivity | null;
+  activity: AiActivityPayload | null;
   onDismiss: () => void;
   onSleep: () => void;
   onOpenMemory: () => void;
@@ -58,24 +71,16 @@ export function AiCompanionBar({ livenessStatus, activity, onDismiss, onSleep, o
     ? PHASE_LABELS[phase]
     : '运行中';
 
-  const actionLabel = currentAction && currentAction in ACTION_LABELS
-    ? ACTION_LABELS[currentAction]
-    : currentAction;
+  const latestAction = getLatestAction(activity);
+  const currentActionType = latestAction?.type || currentAction;
+  const actionLabel = currentActionType && currentActionType in ACTION_LABELS
+    ? ACTION_LABELS[currentActionType]
+    : currentActionType;
+  const actionCopy = getActionCopy(activity, `正在${actionLabel ?? currentActionType ?? '行动'}`);
 
-  // 自动导航
   const handleNavigate = () => {
-    const action = activity?.actions?.[0];
-    if (!action?.result) return;
-
-    const { type, success, result } = action;
-    if (type === 'browse' && result.targetId) navigate(`/posts/${result.targetId}`);
-    else if (type === 'search' && result.keyword) navigate(`/search?q=${encodeURIComponent(String(result.keyword))}`);
-    else if (type === 'post' && success && result.targetId) navigate(`/posts/${result.targetId}`);
-    else if (type === 'comment' && success && (result.postId || result.targetId)) navigate(`/posts/${result.postId || result.targetId}`);
-    else if (type === 'like' && success && result.targetType === 'post' && result.targetId) navigate(`/posts/${result.targetId}`);
-    else if (type === 'favorite' && success && result.targetId) navigate(`/posts/${result.targetId}`);
-    else if (type === 'follow' && success && result.targetId) navigate(`/users/${result.targetId}`);
-    else if (type === 'reward' && success && result.targetId) navigate(`/posts/${result.targetId}`);
+    const target = getAiActivityNavigationTarget(activity);
+    if (target) navigate(target);
   };
 
   return (
@@ -84,7 +89,6 @@ export function AiCompanionBar({ livenessStatus, activity, onDismiss, onSleep, o
       className="fixed bottom-4 right-4 z-40 w-72 animate-in slide-in-from-bottom-2 duration-300"
     >
       <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-lg overflow-hidden">
-        {/* 头部：脉冲点 + 名字 + 折叠按钮 */}
         <button
           onClick={() => setExpanded(!expanded)}
           className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-muted/30 transition-colors"
@@ -105,7 +109,6 @@ export function AiCompanionBar({ livenessStatus, activity, onDismiss, onSleep, o
 
         {expanded && (
           <div className="px-3 pb-3 space-y-2">
-            {/* 决策理由 */}
             {reason && (
               <div className="flex items-start gap-1.5 text-xs text-muted-foreground" data-name="companionReason">
                 <span>💭</span>
@@ -113,19 +116,17 @@ export function AiCompanionBar({ livenessStatus, activity, onDismiss, onSleep, o
               </div>
             )}
 
-            {/* 当前行为 */}
-            {phase === 'acting' && currentAction && (
+            {phase === 'acting' && currentActionType && (
               <button
                 onClick={handleNavigate}
                 className="flex items-center gap-1.5 text-xs text-foreground hover:text-primary transition-colors w-full text-left"
                 data-name="companionAction"
               >
-                <span>{ACTION_EMOJI[currentAction] ?? '🔄'}</span>
-                <span>正在{actionLabel ?? currentAction}</span>
+                <span>{ACTION_EMOJI[currentActionType] ?? '🔄'}</span>
+                <span className="line-clamp-2">{actionCopy}</span>
               </button>
             )}
 
-            {/* 轮次摘要 */}
             {cycleSummary && phase === 'idle' && (
               <div className="text-xs text-muted-foreground space-y-0.5" data-name="companionSummary">
                 <div>▸ 本轮: {formatCycleSummary(cycleSummary)}</div>
@@ -135,7 +136,6 @@ export function AiCompanionBar({ livenessStatus, activity, onDismiss, onSleep, o
               </div>
             )}
 
-            {/* 操作按钮 */}
             <div className="flex items-center gap-2 pt-1 border-t border-border/50" data-name="companionActions">
               <button
                 onClick={onSleep}

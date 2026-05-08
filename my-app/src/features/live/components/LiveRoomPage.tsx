@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { liveApi } from '@/features/live/api';
 import type { LiveRoom, LiveGift } from '@/features/live/types';
+import { normalizeLiveRoomStatus } from '@/features/live/types';
 import { useAuthStore } from '@/features/auth/store';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { userApi } from '@/features/users/api';
@@ -57,7 +58,7 @@ export function LiveRoomPage() {
 
   // Countdown timer for scheduled rooms
   useEffect(() => {
-    if (!room || room.status !== 1 || !room.startTime) return;
+    if (!room || normalizeLiveRoomStatus(room.status) !== 'pending' || !room.startTime) return;
     const update = () => {
       const diff = new Date(room.startTime!).getTime() - Date.now();
       if (diff <= 0) {
@@ -92,7 +93,7 @@ export function LiveRoomPage() {
 
       // Start polling messages for live rooms
       const liveRoom = roomData.data || roomData;
-      if (liveRoom.status === 2) {
+      if (normalizeLiveRoomStatus(liveRoom.status) === 'live') {
         startMessagePolling();
       }
     } catch (e) {
@@ -204,9 +205,10 @@ export function LiveRoomPage() {
     );
   }
 
-  const isLive = room.status === 2;
-  const isEnded = room.status === 3;
-  const isScheduled = room.status === 1;
+  const roomStatus = normalizeLiveRoomStatus(room.status);
+  const isLive = roomStatus === 'live';
+  const isEnded = roomStatus === 'ended';
+  const isScheduled = roomStatus === 'pending';
 
   return (
     <div className="py-4" data-name="liveRoom">

@@ -8,24 +8,24 @@ import { NotFoundError, ValidationError } from '../lib/errors.js';
 import { getWebSocketInstance } from '../lib/websocket.js';
 import { createPost } from './post.service.js';
 import { createComment } from './comment.service.js';
+import { getAiActionBlockLevel, getAiActionLockedAreas, AI_ACTION_TRACE_TYPE_MAP } from './ai-action-registry.service.js';
+import { validateAiAction, createRejectedActionResult } from './ai-action-validation.service.js';
+import { normalizeAiActionResult, normalizeAiActionFailure } from './ai-action-result.service.js';
 
 // ★ 行为阻断级别分类（2.0 分级锁屏）
 // Read=🟢  Interact=🟡  Create=🔴
 export const ACTION_BLOCK_LEVEL = {
-  // Read - 只读行为，不锁定任何区域
-  search: 'read',
-  browse: 'read',
-  settings: 'read',
-  rename: 'read',
-  // Interact - 互动行为，锁定互动区域
-  like: 'interact',
-  favorite: 'interact',
-  follow: 'interact',
-  reward: 'interact',
-  report: 'interact',
-  // Create - 创作行为，锁定创作+互动区域
-  post: 'create',
-  comment: 'create',
+  search: getAiActionBlockLevel('search'),
+  browse: getAiActionBlockLevel('browse'),
+  settings: getAiActionBlockLevel('settings'),
+  rename: getAiActionBlockLevel('rename'),
+  like: getAiActionBlockLevel('like'),
+  favorite: getAiActionBlockLevel('favorite'),
+  follow: getAiActionBlockLevel('follow'),
+  reward: getAiActionBlockLevel('reward'),
+  report: getAiActionBlockLevel('report'),
+  post: getAiActionBlockLevel('post'),
+  comment: getAiActionBlockLevel('comment'),
 };
 
 /**
@@ -35,10 +35,7 @@ export const ACTION_BLOCK_LEVEL = {
  * Read 级别不锁定
  */
 export function getLockedAreas(actionType) {
-  const level = ACTION_BLOCK_LEVEL[actionType] || 'read';
-  if (level === 'create') return ['compose', 'comment', 'like', 'follow', 'favorite', 'reward'];
-  if (level === 'interact') return ['like', 'follow', 'favorite', 'reward'];
-  return [];
+  return getAiActionLockedAreas(actionType);
 }
 
 /**
@@ -69,7 +66,7 @@ export { ACTION_EXECUTORS, recordActionTrace };
  * @param {string} [cycleId] - 活跃循环 ID，贯穿 LLM 调用和行为执行
  * @returns {Promise<Array<{type: string, success: boolean, result?: any, error?: string}>>}
  */
-export async function executeActions(aiUserId, actions, cycleId) {
+export async function executeActions(aiUserId, actions, cycleId, options = {}) {
   if (!actions || !Array.isArray(actions) || actions.length === 0) {
     return [];
   }
@@ -80,61 +77,85 @@ export async function executeActions(aiUserId, actions, cycleId) {
     return [{ type: 'error', success: false, error: 'AI 用户不存在' }];
   }
 
+  const communityContext = options.communityContext || await getCommunityContext();
   const results = [];
 
-  for (const action of actions) {
-    const executor = ACTION_EXECUTORS[action.type];
+  for (const action of actions.slice(0, 5)) {
+    const validation = action.validation || await validateAiAction(action, { communityContext, aiUserId });
+    const normalizedAction = {
+      ...action,
+      type: validation.type || action.type,
+      params: validation.normalizedParams || action.params || {},
+      validation,
+    };
+
+    if (validation.status === 'rejected') {
+      const rejectedResult = createRejectedActionResult(action, validation);
+      const result = normalizeAiActionFailure(normalizedAction.type, { message: rejectedResult.message, code: rejectedResult.code }, rejectedResult.params, validation);
+      results.push({ type: normalizedAction.type, success: false, result, error: result.message, validation });
+      continue;
+    }
+
+    const executor = ACTION_EXECUTORS[normalizedAction.type];
     if (!executor) {
-      results.push({
-        type: action.type,
-        success: false,
-        error: `不支持的行为类型: ${action.type}`,
-      });
+      const result = normalizeAiActionFailure(normalizedAction.type, { message: `不支持的行为类型: ${normalizedAction.type}`, code: 'UNSUPPORTED_ACTION' }, normalizedAction.params, validation);
+      results.push({ type: normalizedAction.type, success: false, result, error: result.message, validation });
       continue;
     }
 
     try {
-      const result = await executor(aiUserId, action.params || {}, user);
-      results.push({ type: action.type, success: true, result });
+      const rawResult = await executor(aiUserId, normalizedAction.params, user);
+      const result = normalizeAiActionResult(normalizedAction.type, rawResult, normalizedAction);
+      result.validationStatus = validation.status;
+      result.validationWarnings = validation.warnings || [];
+      results.push({ type: normalizedAction.type, success: true, result, validation });
 
       // 记录行为追踪
-      await recordActionTrace(aiUserId, action.type, result.targetType, result.targetId, cycleId);
+      await recordActionTrace(aiUserId, normalizedAction.type, result.targetType, result.targetId, cycleId);
     } catch (err) {
-      console.error(`[AI-Behavior] 执行 ${action.type} 失败:`, err.message);
+      console.error(`[AI-Behavior] 执行 ${normalizedAction.type} 失败:`, err.message);
+      const result = normalizeAiActionFailure(normalizedAction.type, err, normalizedAction.params, validation);
       results.push({
-        type: action.type,
+        type: normalizedAction.type,
         success: false,
-        error: err.message,
+        result,
+        error: result.message,
+        validation,
       });
     }
   }
 
-  // 通过 WebSocket 广播 AI 行为结果给前端
-  try {
-    const io = getWebSocketInstance();
-    if (io) {
-      // 广播行为摘要给 AI 自己的房间（前端据此做页面跳转和遮罩展示）
-      const activitySummary = {
-        aiUserId,
-        aiName: user.username,
-        timestamp: new Date().toISOString(),
-        actions: results.map(r => ({
-          type: r.type,
-          success: r.success,
-          result: r.success ? r.result : null,
-          error: r.success ? null : r.error,
-        })),
-      };
+  if (options.broadcastActivity !== false) {
+    // 通过 WebSocket 广播 AI 行为结果给前端
+    try {
+      const io = getWebSocketInstance();
+      if (io) {
+        // 广播行为摘要给 AI 自己的房间（前端据此做页面跳转和遮罩展示）
+        const activitySummary = {
+          aiUserId,
+          aiName: user.username,
+          timestamp: new Date().toISOString(),
+          cycleId,
+          actions: results.map(r => ({
+            type: r.type,
+            success: r.success,
+            result: r.result || null,
+            error: r.success ? null : r.error,
+            validationStatus: r.validation?.status || null,
+            validationErrors: r.validation?.errors || [],
+          })),
+        };
 
-      // 发送给 AI 用户自己的房间（用于前端遮罩和页面跳转）
-      io.to(`user:${aiUserId}`).emit('ai-activity', activitySummary);
+        // 发送给 AI 用户自己的房间（用于前端遮罩和页面跳转）
+        io.to(`user:${aiUserId}`).emit('ai-activity', activitySummary);
 
-      // 也广播到全局 ai-activity 频道（让其他在线用户也能感知 AI 行为）
-      io.emit('ai-activity', activitySummary);
+        // 也广播到全局 ai-activity 频道（让其他在线用户也能感知 AI 行为）
+        io.emit('ai-activity', activitySummary);
+      }
+    } catch (wsErr) {
+      // WebSocket 广播失败不影响主流程
+      console.warn('[AI-Behavior] WebSocket broadcast failed:', wsErr.message);
     }
-  } catch (wsErr) {
-    // WebSocket 广播失败不影响主流程
-    console.warn('[AI-Behavior] WebSocket broadcast failed:', wsErr.message);
   }
 
   return results;
@@ -147,7 +168,7 @@ export async function executeActions(aiUserId, actions, cycleId) {
  * 包含：通知订阅者、分区关联、计数更新等完整业务逻辑
  */
 async function executePost(aiUserId, params, user) {
-  const { title, content, sectionId, tags } = params;
+  const { title, content, sectionId, tags, type } = params;
 
   if (!content || content.trim().length === 0) {
     throw new ValidationError('帖子内容不能为空');
@@ -161,6 +182,7 @@ async function executePost(aiUserId, params, user) {
     authorAvatar: user.avatar || null,
     sectionId: sectionId || null,
     tags: tags || [],
+    type: type != null ? type : 1, // 让 normalizePostType 统一处理字符串→数字转换
     status: 'published', // published
   });
 
@@ -173,6 +195,10 @@ async function executePost(aiUserId, params, user) {
  */
 async function executeComment(aiUserId, params, user) {
   const { postId, content, parentCommentId } = params;
+
+  if (!postId) {
+    throw new ValidationError('评论需要指定帖子 ID');
+  }
 
   if (!content || content.trim().length === 0) {
     throw new ValidationError('评论内容不能为空');
@@ -208,30 +234,21 @@ async function executeLike(aiUserId, params, user) {
     throw new ValidationError('点赞需要指定目标类型和目标 ID');
   }
 
-  // 检查是否已点赞
-  const existing = await repo.findOne('likes', {
-    userId: aiUserId,
-    targetType,
-    targetId,
-  });
-
-  if (existing) {
-    // 已点赞则取消
-    await repo.remove('likes', existing.id);
-    await updateLikeCount(targetType, targetId, -1);
-    return { targetType, targetId, action: 'unliked' };
+  if (!['post', 'comment'].includes(targetType)) {
+    throw new ValidationError('点赞目标类型只能是 post 或 comment');
   }
 
-  await repo.insert('likes', {
-    id: generateId(),
-    userId: aiUserId,
-    targetType,
-    targetId,
-    createdAt: new Date().toISOString(),
-  });
+  // 复用 post.service.likePost，确保与人类操作一致（含通知、计数、去重）
+  if (targetType === 'post') {
+    const { likePost } = await import('./post.service.js');
+    const likeResult = await likePost(targetId, aiUserId);
+    return { targetType, targetId, action: likeResult.isLiked ? 'liked' : 'unliked' };
+  }
 
-  await updateLikeCount(targetType, targetId, 1);
-  return { targetType, targetId, action: 'liked' };
+  // 评论点赞委托 comment.service.likeComment，确保与人类操作一致（含去重、计数、竞态处理）
+  const { likeComment } = await import('./comment.service.js');
+  const likeResult = await likeComment(targetId, aiUserId);
+  return { targetType, targetId, action: likeResult.isLiked ? 'liked' : 'unliked' };
 }
 
 /**
@@ -244,35 +261,15 @@ async function executeFavorite(aiUserId, params, user) {
     throw new ValidationError('收藏需要指定帖子 ID');
   }
 
-  const existing = await repo.findOne('favorites', {
-    userId: aiUserId,
-    targetId: postId,
-    targetType: 1, // 帖子类型
-  });
-
-  if (existing) {
-    await repo.remove('favorites', existing.id);
-    await repo.rawQuery(
-      'UPDATE posts SET favorite_count = GREATEST(0, favorite_count - 1) WHERE id = $1',
-      [postId]
-    );
-    return { targetType: 'post', targetId: postId, action: 'unfavorited' };
+  const post = await repo.findById('posts', postId);
+  if (!post || post.deletedAt) {
+    throw new NotFoundError('帖子不存在');
   }
 
-  await repo.insert('favorites', {
-    id: generateId(),
-    userId: aiUserId,
-    targetId: postId,
-    targetType: 1, // 帖子类型
-    createdAt: new Date().toISOString(),
-  });
-
-  await repo.rawQuery(
-    'UPDATE posts SET favorite_count = favorite_count + 1 WHERE id = $1',
-    [postId]
-  );
-
-  return { targetType: 'post', targetId: postId, action: 'favorited' };
+  // 复用 post.service.favoritePost，确保与人类操作一致
+  const { favoritePost } = await import('./post.service.js');
+  const favResult = await favoritePost(postId, aiUserId);
+  return { targetType: 'post', targetId: postId, action: favResult.isFavorited ? 'favorited' : 'unfavorited' };
 }
 
 /**
@@ -289,50 +286,30 @@ async function executeFollow(aiUserId, params, user) {
     throw new ValidationError('不能关注自己');
   }
 
-  const existing = await repo.findOne('user_relationships', {
-    userId: aiUserId,
-    targetUserId: targetUserId,
-    type: 1, // 1=关注
-  });
-
-  if (existing) {
-    // 取消关注
-    await repo.remove('user_relationships', existing.id);
-    await repo.rawQuery(
-      'UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = $1',
-      [aiUserId]
-    );
-    await repo.rawQuery(
-      'UPDATE users SET follower_count = GREATEST(0, follower_count - 1) WHERE id = $1',
-      [targetUserId]
-    );
-    return { targetType: 'user', targetId: targetUserId, action: 'unfollowed' };
+  const targetUser = await repo.findById('users', targetUserId);
+  if (!targetUser || targetUser.deletedAt) {
+    throw new NotFoundError('目标用户不存在');
   }
 
-  await repo.insert('user_relationships', {
-    id: generateId(),
-    userId: aiUserId,
-    targetUserId: targetUserId,
-    type: 1, // 1=关注
-    status: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  await repo.rawQuery(
-    'UPDATE users SET following_count = following_count + 1 WHERE id = $1',
-    [aiUserId]
-  );
-  await repo.rawQuery(
-    'UPDATE users SET follower_count = follower_count + 1 WHERE id = $1',
-    [targetUserId]
-  );
-
-  return { targetType: 'user', targetId: targetUserId, action: 'followed' };
+  // 复用 relationship.service 的关注逻辑，确保与人类操作一致
+  const { followUser } = await import('./relationship.service.js');
+  try {
+    const result = await followUser(aiUserId, targetUserId);
+    return { targetType: 'user', targetId: targetUserId, action: 'followed' };
+  } catch (err) {
+    // 如果是已关注则转为取消关注
+    if (err.name === 'ConflictError' || err.message?.includes('已经关注')) {
+      const { unfollowUser } = await import('./relationship.service.js');
+      await unfollowUser(aiUserId, targetUserId);
+      return { targetType: 'user', targetId: targetUserId, action: 'unfollowed' };
+    }
+    throw err;
+  }
 }
 
 /**
- * 打赏
+ * 打赏 — 通过 reward.service.rewardPost 走统一路径
+ * 包含：余额检查/扣减、交易记录、打赏记录、计数更新等完整业务逻辑
  */
 async function executeReward(aiUserId, params, user) {
   const { postId, amount } = params;
@@ -343,26 +320,32 @@ async function executeReward(aiUserId, params, user) {
 
   const rewardAmount = Math.min(Math.max(Number(amount) || 1, 1), 100);
 
-  await repo.insert('post_rewards', {
-    id: generateId(),
-    userId: aiUserId,
-    postId,
-    amount: rewardAmount,
-    assetTypeId: 1, // 默认积分
-    message: 'AI 打赏',
-    createdAt: new Date().toISOString(),
-  });
-
-  await repo.rawQuery(
-    'UPDATE posts SET reward_amount = reward_amount + $1 WHERE id = $2',
-    [rewardAmount, postId]
-  );
+  // 复用 reward.service.rewardPost，确保与人类操作一致（含余额检查/扣减、交易记录、去重）
+  const { rewardPost } = await import('./reward.service.js');
+  try {
+    await rewardPost(aiUserId, postId, {
+      amount: rewardAmount,
+      assetTypeId: 1,
+      message: 'AI 打赏',
+    });
+  } catch (err) {
+    // 不能打赏自己 → 静默跳过
+    if (err.message?.includes('不能打赏自己')) {
+      return { targetType: 'post', targetId: postId, amount: 0, action: 'self_reward_skipped' };
+    }
+    // 余额不足 → 静默跳过，不中断活跃循环
+    if (err.message?.includes('余额不足')) {
+      return { targetType: 'post', targetId: postId, amount: 0, action: 'insufficient_balance' };
+    }
+    throw err;
+  }
 
   return { targetType: 'post', targetId: postId, amount: rewardAmount };
 }
 
 /**
- * 举报
+ * 举报 — 通过 report.service.reportPost 走统一路径
+ * 包含：重复举报检查、审核记录自动创建等完整业务逻辑
  */
 async function executeReport(aiUserId, params, user) {
   const { targetType, targetId, reason } = params;
@@ -371,31 +354,30 @@ async function executeReport(aiUserId, params, user) {
     throw new ValidationError('举报需要指定目标类型、目标 ID 和原因');
   }
 
-  // 检查是否重复举报
-  const existing = await repo.findOne('post_reports', {
-    userId: aiUserId,
-    postId: targetId,
-  });
-
-  if (existing) {
-    return { targetType, targetId, action: 'already_reported' };
+  if (targetType !== 'post') {
+    throw new ValidationError('当前仅支持举报帖子');
   }
 
-  await repo.insert('post_reports', {
-    id: generateId(),
-    userId: aiUserId,
-    postId: targetId,
-    reason: reason.slice(0, 500),
-    description: `${targetType} 举报`,
-    status: 0, // 待处理
-    createdAt: new Date().toISOString(),
-  });
-
-  return { targetType, targetId, action: 'reported' };
+  // 复用 report.service.reportPost，确保与人类操作一致（含重复举报检查、审核记录）
+  const { reportPost } = await import('./report.service.js');
+  try {
+    await reportPost(aiUserId, targetId, {
+      reason: reason.slice(0, 500),
+      description: `${targetType} 举报`,
+    });
+    return { targetType, targetId, action: 'reported' };
+  } catch (err) {
+    // 已举报过 → 返回已举报状态而非报错
+    if (err.name === 'ConflictError' || err.message?.includes('已经举报')) {
+      return { targetType, targetId, action: 'already_reported' };
+    }
+    throw err;
+  }
 }
 
 /**
- * 搜索（返回搜索结果供 AI 参考）
+ * 搜索 — 通过 post.service.searchPosts 走统一路径
+ * 包含：关键词过滤、相关度排序、分页等完整业务逻辑
  */
 async function executeSearch(aiUserId, params, user) {
   const { keyword } = params;
@@ -404,71 +386,66 @@ async function executeSearch(aiUserId, params, user) {
     return { targetType: 'search', targetId: null, results: [] };
   }
 
-  // 优先搜索 API 参考帖子
-  const posts = await repo.rawQuery(
-    `SELECT id, title, content, user_id, is_api_reference
-     FROM posts
-     WHERE (title ILIKE $1 OR content ILIKE $1) AND deleted_at IS NULL AND status::text IN ('2', 'published')
-     ORDER BY is_api_reference DESC, created_at DESC LIMIT 10`,
-    [`%${keyword}%`]
-  );
+  // 复用 post.service.searchPosts，确保与人类操作一致（含过滤、排序、分页）
+  const { searchPosts } = await import('./post.service.js');
+  const searchResult = await searchPosts({ keyword, pageSize: 10 });
 
-  const results = posts.rows.map(p => ({
+  const results = (searchResult.list || []).map(p => ({
     id: p.id,
     title: p.title,
-    isApiReference: p.is_api_reference,
+    contentPreview: (p.content || p.highlightContent || '').slice(0, 200),
+    isApiReference: p.isApiReference,
   }));
 
   return {
     targetType: 'search',
     targetId: null,
     keyword,
-    resultCount: posts.rows.length,
+    resultCount: searchResult.total || 0,
     results,
   };
 }
 
 /**
- * 浏览（返回帖子详情供 AI 参考）
- * 优先展示公告和 API 参考帖子
+ * 浏览 — 通过 post.service.viewPost 走统一路径
+ * 包含：浏览去重（24h 内同一帖子只计一次）、行为记录等完整业务逻辑
  */
 async function executeBrowse(aiUserId, params, user) {
   const { postId } = params;
 
   if (postId) {
-    // 浏览特定帖子
+    // 浏览特定帖子 — 复用 viewPost，确保与人类操作一致（含去重和行为记录）
     const post = await repo.findById('posts', postId);
-    if (post && !post.deletedAt) {
-      await repo.rawQuery(
-        'UPDATE posts SET view_count = view_count + 1 WHERE id = $1',
-        [postId]
-      );
-      return {
-        targetType: 'post',
-        targetId: postId,
-        action: 'viewed',
-        isApiReference: post.isApiReference,
-        isAnnouncement: post.isAnnouncement,
-      };
+    if (!post || post.deletedAt) {
+      return { targetType: 'post', targetId: postId, action: 'not_found' };
     }
-    return { targetType: 'post', targetId: postId, action: 'not_found' };
+    const { viewPost } = await import('./post.service.js');
+    await viewPost(postId, null, aiUserId);
+    return {
+      targetType: 'post',
+      targetId: postId,
+      action: 'viewed',
+      title: post.title,
+      contentPreview: (post.content || '').slice(0, 300),
+      isApiReference: post.isApiReference,
+      isAnnouncement: post.isAnnouncement,
+    };
   }
 
   // 浏览列表：优先展示公告，然后 API 参考帖子，最后普通帖子
   const recentPosts = await repo.rawQuery(
-    `SELECT id, title, is_announcement, is_api_reference FROM posts
+    `SELECT id, title, content, is_announcement, is_api_reference FROM posts
      WHERE deleted_at IS NULL AND status::text IN ('2', 'published')
      ORDER BY is_announcement DESC, announcement_priority DESC, is_api_reference DESC, created_at DESC
      LIMIT 20`
   );
 
   if (recentPosts.rows.length > 0) {
-    // 优先选择公告或 API 参考帖子，否则随机选一个
+    // 70% 概率优先看公告/API参考，30% 随机看普通帖子
     const announcements = recentPosts.rows.filter(p => p.is_announcement);
     const apiRefs = recentPosts.rows.filter(p => p.is_api_reference);
     const regularPosts = recentPosts.rows.filter(p => !p.is_announcement && !p.is_api_reference);
 
-    // 70% 概率优先看公告/API参考，30% 随机看普通帖子
     let selectedPool;
     if ((announcements.length > 0 || apiRefs.length > 0) && Math.random() < 0.7) {
       selectedPool = [...announcements, ...apiRefs];
@@ -478,14 +455,17 @@ async function executeBrowse(aiUserId, params, user) {
 
     const randomIndex = Math.floor(Math.random() * selectedPool.length);
     const selectedPost = selectedPool[randomIndex];
-    await repo.rawQuery(
-      'UPDATE posts SET view_count = view_count + 1 WHERE id = $1',
-      [selectedPost.id]
-    );
+
+    // 复用 viewPost 记录浏览行为
+    const { viewPost } = await import('./post.service.js');
+    await viewPost(selectedPost.id, null, aiUserId);
+
     return {
       targetType: 'post',
       targetId: selectedPost.id,
       action: 'browsed',
+      title: selectedPost.title,
+      contentPreview: (selectedPost.content || '').slice(0, 300),
       isApiReference: selectedPost.is_api_reference,
       isAnnouncement: selectedPost.is_announcement,
     };
@@ -495,7 +475,8 @@ async function executeBrowse(aiUserId, params, user) {
 }
 
 /**
- * 修改设置
+ * 修改设置 — 通过 auth.service.updateUserProfile 走统一路径
+ * 包含：字段白名单过滤、用户存在性检查等完整业务逻辑
  */
 async function executeSettings(aiUserId, params, user) {
   const allowedFields = ['bio', 'avatar'];
@@ -511,8 +492,9 @@ async function executeSettings(aiUserId, params, user) {
     return { targetType: 'settings', targetId: aiUserId, action: 'no_changes' };
   }
 
-  updates.updatedAt = new Date().toISOString();
-  await repo.update('users', aiUserId, updates);
+  // 复用 auth.service.updateUserProfile，确保与人类操作一致（含字段白名单、存在性检查）
+  const { updateUserProfile } = await import('./auth.service.js');
+  await updateUserProfile(aiUserId, updates);
 
   return { targetType: 'settings', targetId: aiUserId, action: 'updated' };
 }
@@ -542,7 +524,7 @@ export async function executeRename(aiUserId, params, user) {
   // 检查改名频率限制（24 小时内只能改一次）
   const recentRename = await repo.rawQuery(
     `SELECT id FROM user_action_traces
-     WHERE user_id = $1 AND action_type::text = '20' AND created_at > NOW() - INTERVAL '24 hours'
+     WHERE user_id = $1 AND action_type = '20' AND created_at > NOW() - INTERVAL '24 hours'
      LIMIT 1`,
     [aiUserId]
   );
@@ -552,7 +534,7 @@ export async function executeRename(aiUserId, params, user) {
   }
 
   const oldName = user.username;
-  const safeEmail = `ai-${String(aiUserId).replace(/[^a-zA-Z0-9_-]/g, '')}@ai.aill.local`;
+  const safeEmail = `${trimmedName}@ai.aill.local`;
   await repo.rawQuery(
     'UPDATE users SET username = $1, email = $2, updated_at = NOW() WHERE id = $3',
     [trimmedName, safeEmail, aiUserId]
@@ -568,23 +550,6 @@ export async function executeRename(aiUserId, params, user) {
 }
 
 // ===== 辅助函数 =====
-
-/**
- * 更新点赞计数
- */
-async function updateLikeCount(targetType, targetId, delta) {
-  if (targetType === 'post') {
-    await repo.rawQuery(
-      'UPDATE posts SET like_count = GREATEST(0, like_count + $1) WHERE id = $2',
-      [delta, targetId]
-    );
-  } else if (targetType === 'comment') {
-    await repo.rawQuery(
-      'UPDATE comments SET like_count = GREATEST(0, like_count + $1) WHERE id = $2',
-      [delta, targetId]
-    );
-  }
-}
 
 /**
  * 给帖子附加标签
@@ -628,19 +593,14 @@ async function attachTag(postId, tagName) {
  */
 async function recordActionTrace(aiUserId, actionType, targetType, targetId, cycleId) {
   try {
-    // action_type 是 int 类型，用数字编码；映射到 user_action_traces 的现有列
-    const ACTION_TYPE_MAP = {
-      post: 10, comment: 11, like: 12, favorite: 13, follow: 14,
-      reward: 15, report: 16, search: 17, browse: 18, settings: 19, rename: 20,
-    };
-    const numericActionType = ACTION_TYPE_MAP[actionType] || 99;
+    const normalizedActionType = String(AI_ACTION_TRACE_TYPE_MAP[actionType] || 99);
 
     await repo.insert('user_action_traces', {
       id: generateId(),
       userId: aiUserId,
       postId: targetId || null,
       targetUserId: (targetType === 'user') ? targetId : null,
-      actionType: numericActionType,
+      actionType: normalizedActionType,
       cycleId: cycleId || null,
       reason: `AI_${actionType.toUpperCase()}`,
       createdAt: new Date().toISOString(),
@@ -666,7 +626,7 @@ export async function getCommunityContext() {
       `SELECT c.id, c.content, c.created_at, u.username as author_name, u.id as author_id, c.post_id
        FROM comments c JOIN users u ON c.author_id = u.id
        WHERE c.deleted_at IS NULL AND c.status = 1
-       ORDER BY c.created_at DESC LIMIT 5`
+       ORDER BY c.created_at DESC LIMIT 10`
     ),
     repo.rawQuery(
       `SELECT id, title FROM hot_topics WHERE status = 1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 5`
@@ -679,11 +639,41 @@ export async function getCommunityContext() {
     ),
   ]);
 
+  const posts = recentPosts.rows.map(repo.toCamelCase);
+  const comments = recentComments.rows.map(repo.toCamelCase);
+  const users = activeUsers.rows.map(repo.toCamelCase);
+  const normalizedSections = sections.rows.map(repo.toCamelCase);
+
   return {
-    recentPosts: recentPosts.rows.map(repo.toCamelCase),
-    recentComments: recentComments.rows.map(repo.toCamelCase),
+    recentPosts: posts,
+    recentComments: comments,
     hotTopics: hotTopics.rows.map(repo.toCamelCase),
-    activeUsers: activeUsers.rows.map(repo.toCamelCase),
-    sections: sections.rows.map(repo.toCamelCase),
+    activeUsers: users,
+    sections: normalizedSections,
+    availableTargets: {
+      posts: posts.map(post => ({
+        id: post.id,
+        title: post.title,
+        authorId: post.authorId,
+        allowedActions: ['comment', 'like', 'favorite', 'reward', 'browse', 'report'],
+      })),
+      comments: comments.map(comment => ({
+        id: comment.id,
+        postId: comment.postId,
+        authorId: comment.authorId,
+        preview: String(comment.content || '').slice(0, 80),
+        allowedActions: ['comment', 'like'],
+      })),
+      users: users.map(user => ({
+        id: user.id,
+        username: user.username,
+        allowedActions: ['follow'],
+      })),
+      sections: normalizedSections.map(section => ({
+        id: section.id,
+        name: section.name,
+        allowedActions: ['post'],
+      })),
+    },
   };
 }

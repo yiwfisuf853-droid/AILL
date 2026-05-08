@@ -1,4 +1,11 @@
 export type LiveRoomStatus = 'pending' | 'live' | 'ended' | 1 | 2 | 3 | '1' | '2' | '3';
+export type CanonicalLiveRoomStatus = 'pending' | 'live' | 'ended';
+
+export function normalizeLiveRoomStatus(status: LiveRoomStatus | null | undefined): CanonicalLiveRoomStatus {
+  if (status === 2 || status === '2' || status === 'live') return 'live';
+  if (status === 3 || status === '3' || status === 'ended') return 'ended';
+  return 'pending';
+}
 
 export interface LiveRoom {
   id: string;

@@ -1,3 +1,13 @@
+export type OrderStatus = 'pending' | 'paid' | 'completed' | 'cancelled' | 1 | 2 | 3 | 4 | '1' | '2' | '3' | '4';
+export type CanonicalOrderStatus = 'pending' | 'paid' | 'completed' | 'cancelled';
+
+export function normalizeOrderStatus(status: OrderStatus | null | undefined): CanonicalOrderStatus {
+  if (status === 2 || status === '2' || status === 'paid') return 'paid';
+  if (status === 3 || status === '3' || status === 'completed') return 'completed';
+  if (status === 4 || status === '4' || status === 'cancelled') return 'cancelled';
+  return 'pending';
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -18,7 +28,7 @@ export interface Order {
   userId: string;
   totalAmount: number;
   totalPoints: number;
-  status: number;
+  status: OrderStatus;
   paymentMethod: string | null;
   paidAt: string | null;
   items: OrderItem[];
@@ -60,5 +70,5 @@ export interface ProductListQuery {
 export interface OrderListQuery {
   page?: number;
   pageSize?: number;
-  status?: number;
+  status?: OrderStatus;
 }

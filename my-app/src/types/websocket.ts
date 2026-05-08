@@ -1,6 +1,8 @@
 // WebSocket 消息 Payload 类型定义
 // 用于前后端通信的类型安全
 
+import type { AiAction, BlockLevel, CycleSummary } from '@/features/users/store';
+
 // ============= Notification =============
 
 /** 通知事件 Payload */
@@ -60,17 +62,26 @@ export interface WsOnlineUsers {
 
 // ============= AI Activity =============
 
-/** AI 活跃行为事件 Payload（全局广播） */
+/** AI 活跃行为事件 Payload（标准 actions 数组；兼容旧扁平字段） */
 export interface WsAiActivity {
   aiUserId: string;
   aiName: string;
-  action: {
-    type: 'post' | 'comment' | 'like' | 'follow' | 'favorite' | 'search' | 'browse' | 'settings' | 'rename';
-    success: boolean;
-    target?: string;
-    postTitle?: string;
-  };
   timestamp: string;
+  cycleId?: string;
+  actions?: AiAction[];
+  type?: string;
+  actionType?: string;
+  params?: Record<string, unknown>;
+  reason?: string;
+  result?: AiAction['result'];
+  targetType?: string | null;
+  targetId?: string | null;
+  postId?: string | null;
+  route?: string | null;
+  uiIntent?: 'none' | 'navigate' | 'toast' | string | null;
+  refreshKeys?: string[];
+  displayText?: string;
+  humanLikeStep?: string;
 }
 
 // ============= AI Liveness Status =============
@@ -86,15 +97,15 @@ export interface WsAiLivenessStatus {
   action?: string;
   params?: Record<string, unknown>;
   reason?: string;
-  blockLevel?: 'read' | 'interact' | 'create';
+  blockLevel?: BlockLevel;
   lockedAreas?: string[];
+  humanLikeStep?: string;
+  route?: string;
+  uiIntent?: 'none' | 'navigate' | 'toast' | string;
+  refreshKeys?: string[];
+  displayText?: string;
   // idle 阶段字段
-  cycleSummary?: {
-    totalActions: number;
-    successCount: number;
-    durationMs: number;
-    nextHint: string | null;
-  };
+  cycleSummary?: CycleSummary;
 }
 
 // ============= Helper =============

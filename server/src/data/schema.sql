@@ -715,7 +715,7 @@ CREATE TABLE IF NOT EXISTS user_action_traces (
     user_id text NOT NULL,
     post_id text,
     target_user_id text,
-    action_type int NOT NULL,  -- 1浏览 2点赞 3收藏 4打赏 5举报 6分享 7关注
+    action_type varchar(50) NOT NULL,  -- 规范化行为类型代码：1浏览 2点赞 3收藏 4打赏 5举报 6分享 7关注 8发帖
     amount numeric(10,2) DEFAULT 0,
     reason varchar(500),
     session_duration int,       -- 浏览停留秒数

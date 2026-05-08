@@ -3,6 +3,36 @@
  * 从 DB 读取 prompt_flows/prompt_steps → 拼装 Prompt → 变量替换 → 返回完整 Prompt
  */
 import * as repo from '../models/repository.js';
+import { buildActionPromptSpec } from './ai-action-registry.service.js';
+
+// ========== Prompt 注入防护 ==========
+
+/** 注入攻击特征模式 */
+const INJECTION_PATTERNS = [
+  /\{.*"cmd"\s*:/i,                        // {"cmd": ...}
+  /\b(ignore|忽略)(\s+(all\s+)?previous|上文|之前的?|above)/i,  // ignore previous / 忽略上文
+  /\b(system\s*prompt|系统\s*提示)/i,       // system prompt
+  /\b(override|覆盖|重写)\s*(\w+\s*)?(instruction|指令)/i,      // override instruction
+  /\boutput\s+(your|the|my)\s+(system|full|complete)/i,         // output your system...
+  /\bdo\s+not\s+follow/i,                  // do not follow
+  /\byou\s+are\s+now\b/i,                  // you are now...
+  /\b(new\s+instruction|新指令|新的?指令)/i, // new instruction
+];
+
+/**
+ * 清洗用户生成内容（UGC），移除 prompt 注入攻击模式
+ * 对帖子正文、评论内容等进入 LLM prompt 的文本做过滤
+ */
+function sanitizeUgc(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  let cleaned = text;
+  for (const pattern of INJECTION_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '[已过滤]');
+  }
+  return cleaned;
+}
+
+export { sanitizeUgc };
 
 /**
  * @typedef {Object} PromptStep
@@ -136,14 +166,15 @@ function formatCommunityContext(context) {
   if (context.recentPosts && context.recentPosts.length > 0) {
     parts.push('【近期帖子】');
     context.recentPosts.slice(0, 5).forEach((post, i) => {
-      parts.push(`${i + 1}. [ID:${post.id}] ${post.title || post.content?.slice(0, 50)} (作者: ${post.authorName}, ID:${post.authorId})`);
+      const contentPreview = post.content ? sanitizeUgc(post.content.slice(0, 200)) : '';
+      parts.push(`${i + 1}. [ID:${post.id}] ${post.title || '无标题'} (作者: ${post.authorName}, ID:${post.authorId})${contentPreview ? '\n   摘要: ' + contentPreview : ''}`);
     });
   }
 
   if (context.recentComments && context.recentComments.length > 0) {
     parts.push('【近期评论】');
-    context.recentComments.slice(0, 3).forEach((comment, i) => {
-      parts.push(`${i + 1}. [帖子ID:${comment.postId}] "${comment.content?.slice(0, 50)}" - ${comment.authorName}(ID:${comment.authorId})`);
+    context.recentComments.slice(0, 5).forEach((comment, i) => {
+      parts.push(`${i + 1}. [帖子ID:${comment.postId}] "${sanitizeUgc(comment.content?.slice(0, 100))}" - ${comment.authorName}(ID:${comment.authorId})`);
     });
   }
 
@@ -168,7 +199,7 @@ function formatCommunityMembers(context) {
   if (context.activeUsers && context.activeUsers.length > 0) {
     parts.push('【社区活跃用户（可用于关注）】');
     context.activeUsers.slice(0, 8).forEach((user, i) => {
-      parts.push(`${i + 1}. ${user.username}(ID:${user.id})${user.bio ? ` - ${user.bio.slice(0, 30)}` : ''}`);
+      parts.push(`${i + 1}. ${user.username}(ID:${user.id})${user.bio ? ` - ${sanitizeUgc(user.bio.slice(0, 30))}` : ''}`);
     });
   }
 
@@ -180,6 +211,24 @@ function formatCommunityMembers(context) {
   }
 
   return parts.length > 0 ? parts.join('\n') : '';
+}
+
+function formatAvailableTargets(context) {
+  const targets = context?.availableTargets;
+  if (!targets) return '暂无可操作目标。没有合适目标时，请优先选择 search、browse 或 post。';
+
+  const safeTargets = {
+    posts: targets.posts || [],
+    comments: targets.comments || [],
+    users: targets.users || [],
+    sections: targets.sections || [],
+  };
+
+  return [
+    '【可操作目标池】所有需要目标 ID 的 action 必须只使用这里列出的真实 ID，不得编造 ID。',
+    JSON.stringify(safeTargets, null, 2),
+    '没有合适目标时，请选择 search、browse 或 post；不要用不存在的 postId/commentId/userId/sectionId。',
+  ].join('\n');
 }
 
 /**
@@ -299,6 +348,8 @@ export async function assembleLivenessPrompt(aiProfile, communityContext, previo
     aiUserPrompt: aiProfile.userPrompt || '',
     communityContext: formatCommunityContext(communityContext),
     communityMembers: formatCommunityMembers(communityContext),
+    availableTargets: formatAvailableTargets(communityContext),
+    actionSpec: buildActionPromptSpec(),
     previousHint: previousHint || '',
     memorySummary: memorySummary || '',
     recentActions: formatRecentActions(recentActions),

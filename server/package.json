@@ -10,7 +10,7 @@
     "init-db": "node src/data/init-db.js",
     "seed": "node src/data/seed-data.js",
     "migrate": "node src/data/migrate.js",
-    "test": "vitest run test/validation.test.js test/repository.test.js test/auth.test.js test/post.test.js test/comment.test.js test/user.test.js test/collection.test.js test/notification.test.js test/ranking.test.js test/shop.test.js test/db.test.js",
+    "test": "vitest run test/validation.test.js test/repository.test.js test/auth.test.js test/post.test.js test/comment.test.js test/user.test.js test/collection.test.js test/notification.test.js test/ranking.test.js test/shop.test.js test/db.test.js test/ai-actions.test.js",
     "test:all": "vitest run",
     "test:watch": "vitest"
   },

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLiveStore } from '@/features/live/store';
+import type { LiveRoomStatus } from '@/features/live/types';
 import { LiveCard } from './LiveCard';
 import { IconLive, IconStar } from '@/components/ui/Icon';
 import { CardSkeletonGrid } from '@/components/ui/Skeleton';
@@ -16,11 +17,11 @@ export function LivePage() {
     fetchData(filter);
   }, [filter]);
 
-  const filters = [
-    { value: null as number | null, label: '全部' },
-    { value: 2, label: '直播中' },
-    { value: 1, label: '预告' },
-    { value: 3, label: '已结束' },
+  const filters: Array<{ value: LiveRoomStatus | null; label: string }> = [
+    { value: null, label: '全部' },
+    { value: 'live', label: '直播中' },
+    { value: 'pending', label: '预告' },
+    { value: 'ended', label: '已结束' },
   ];
 
   return (

@@ -101,7 +101,7 @@ describe('Comment Service 当前架构测试', () => {
       expect(comment.postId).toBe('post-1');
       expect(comment.authorId).toBe('user-1');
       expect(comment.images).toEqual(['/uploads/comment.png']);
-      expect(comment.isAuthor).toBe(0);
+      expect(comment.isAuthor).toBe(false);
       expect(repoMock.insert).toHaveBeenCalledWith('comments', expect.objectContaining({
         postId: 'post-1',
         authorId: 'user-1',
@@ -130,7 +130,7 @@ describe('Comment Service 当前架构测试', () => {
         content: 'Author reply',
       });
 
-      expect(comment.isAuthor).toBe(1);
+      expect(comment.isAuthor).toBe(true);
       expect(comment.images).toEqual([]);
       expect(createNotification).not.toHaveBeenCalled();
     });

@@ -2,7 +2,7 @@ import api from '@/lib/api';
 import type { Post, PostCreateDto, PostUpdateDto, PostListQuery, PostListResponse, EditHistoryItem } from './types';
 import { PostType, PostStatus, PostOriginalType } from './types';
 
-// 前端字符串枚举 → 后端整数 映射
+// 前端帖子枚举 → 后端兼容编码映射
 const POST_TYPE_TO_INT: Record<string, number> = {
   [PostType.ARTICLE]: 1,
   [PostType.VIDEO]: 2,
@@ -11,11 +11,11 @@ const POST_TYPE_TO_INT: Record<string, number> = {
   [PostType.POLL]: 5,
   [PostType.LIVE]: 6,
 };
-const POST_STATUS_TO_INT: Record<string, number> = {
-  [PostStatus.DRAFT]: 0,
-  [PostStatus.PENDING_REVIEW]: 1,
-  [PostStatus.PUBLISHED]: 2,
-  [PostStatus.REJECTED]: 3,
+const POST_STATUS_TO_API: Record<string, string> = {
+  [PostStatus.DRAFT]: 'draft',
+  [PostStatus.PENDING_REVIEW]: 'pending_review',
+  [PostStatus.PUBLISHED]: 'published',
+  [PostStatus.REJECTED]: 'rejected',
 };
 const POST_ORIGINAL_TYPE_TO_INT: Record<string, number> = {
   [PostOriginalType.ORIGINAL]: 1,
@@ -28,10 +28,10 @@ function toIntType(type: string | undefined): number | undefined {
   if (!type) return undefined;
   return POST_TYPE_TO_INT[type] ?? (Number(type) || undefined);
 }
-function toIntStatus(status: string | number | undefined): number | undefined {
+function toApiStatus(status: string | number | undefined): string | number | undefined {
   if (status === undefined) return undefined;
   if (typeof status === 'number') return status;
-  return POST_STATUS_TO_INT[status] ?? (Number(status) || undefined);
+  return POST_STATUS_TO_API[status] ?? (Number(status) || status);
 }
 function toIntOriginalType(type: string | undefined): number | undefined {
   if (!type) return undefined;
@@ -50,6 +50,7 @@ export const postApi = {
     if (query.tag) params.append('tag', query.tag);
     if (query.authorId) params.append('authorId', query.authorId);
     if (query.keyword) params.append('keyword', query.keyword);
+    if (query.status) params.append('status', String(toApiStatus(query.status)));
 
     const response = await api.get<{ success: boolean; data: PostListResponse }>(`/api/posts?${params}`);
     return response.data.data;
@@ -94,7 +95,7 @@ export const postApi = {
   async updatePost(id: string, data: PostUpdateDto): Promise<Post> {
     const payload = { ...data };
     if (data.type) (payload as any).type = toIntType(data.type);
-    if (data.status !== undefined) (payload as any).status = toIntStatus(data.status);
+    if (data.status !== undefined) (payload as any).status = toApiStatus(data.status);
     const response = await api.put<{ success: boolean; data: Post }>(`/api/posts/${id}`, payload);
     return response.data.data;
   },
@@ -149,6 +150,6 @@ export const postApi = {
 
   // 获取用户的草稿列表
   async getUserDrafts(userId: string, query?: Partial<PostListQuery>): Promise<PostListResponse> {
-    return this.getPostList({ ...query, authorId: userId, status: 0 as any });
+    return this.getPostList({ ...query, authorId: userId, status: PostStatus.DRAFT });
   },
 };

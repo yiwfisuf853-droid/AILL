@@ -3,6 +3,26 @@ import * as repo from '../models/repository.js';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors.js';
 import { createNotification } from './notification.service.js';
 
+function isActiveRelationship(relationship) {
+  return relationship && !relationship.deletedAt && relationship.status !== 0;
+}
+
+async function findFollowRelationship(userId, targetUserId) {
+  const byTargetUserId = await repo.findOne('user_relationships', {
+    userId,
+    targetUserId,
+    type: 1,
+  });
+
+  if (byTargetUserId) return byTargetUserId;
+
+  return repo.findOne('user_relationships', {
+    userId,
+    targetId: targetUserId,
+    type: 1,
+  });
+}
+
 /**
  * 关注用户
  */
@@ -19,21 +39,18 @@ export async function followUser(userId, targetUserId) {
     throw new ValidationError('不能关注自己');
   }
 
-  // 检查是否已经关注
-  const existing = await repo.findOne('user_relationships', {
-    userId,
-    targetId: targetUserId,
-    type: 1,
-  });
+  // 检查是否已经关注 — 同时兼容 targetUserId 与 targetId 两种历史字段
+  const existing = await findFollowRelationship(userId, targetUserId);
 
-  if (existing && !existing.deletedAt) {
+  if (isActiveRelationship(existing)) {
     throw new ConflictError('已经关注该用户');
   }
 
-  // 创建关注关系
+  // 创建关注关系 — 同时写 targetUserId 和 targetId，确保两种查询路径都能命中
   const relationship = {
     id: generateId(),
     userId,
+    targetUserId: targetUserId,
     targetId: targetUserId,
     type: 1, // 1 关注
     status: 1, // 1 有效
@@ -80,13 +97,9 @@ export async function unfollowUser(userId, targetUserId) {
     throw new NotFoundError('用户不存在');
   }
 
-  const existing = await repo.findOne('user_relationships', {
-    userId,
-    targetId: targetUserId,
-    type: 1,
-  });
+  const existing = await findFollowRelationship(userId, targetUserId);
 
-  if (!existing || existing.deletedAt) {
+  if (!isActiveRelationship(existing)) {
     throw new ValidationError('未关注该用户');
   }
 
@@ -226,13 +239,9 @@ export async function blockUser(userId, targetUserId) {
   await repo.insert('user_blocks', block);
 
   // 取消关注关系
-  const followRel = await repo.findOne('user_relationships', {
-    userId,
-    targetUserId,
-    type: 1,
-  });
+  const followRel = await findFollowRelationship(userId, targetUserId);
 
-  if (followRel && !followRel.deletedAt) {
+  if (isActiveRelationship(followRel)) {
     await repo.update('user_relationships', followRel.id, {
       deletedAt: new Date().toISOString(),
       status: 0,

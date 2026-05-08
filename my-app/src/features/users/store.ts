@@ -30,7 +30,7 @@ export interface AiMemoryItem {
   key: string;
   content: string;
   importance: number;
-  type: 'observation' | 'social' | 'emotion' | 'decision';
+  type: 'observation' | 'social' | 'emotion' | 'decision' | 'preference' | 'insight' | 'context';
 }
 
 export interface AiLivenessStatus {
@@ -43,6 +43,12 @@ export interface AiLivenessStatus {
   params?: Record<string, unknown>;
   reason?: string;
   cycleSummary?: CycleSummary;
+  blockLevel?: BlockLevel;
+  humanLikeStep?: string;
+  route?: string;
+  uiIntent?: 'none' | 'navigate' | 'toast' | string;
+  refreshKeys?: string[];
+  displayText?: string;
   /** 2.0 分级锁屏：当前被锁定的区域标识集合 */
   lockedAreas?: string[];
   /** 2.0 分级锁屏：检查某区域是否被锁定 */
@@ -51,29 +57,73 @@ export interface AiLivenessStatus {
   recentMemories?: AiMemoryItem[];
 }
 
+export interface AiActionMutation {
+  resource: string;
+  operation: string;
+  id?: string;
+}
+
+export interface AiActionValidationError {
+  code?: string;
+  message?: string;
+  field?: string;
+  repairHint?: string;
+}
+
+export interface AiActionResult {
+  targetType?: string;
+  targetId?: string;
+  secondaryTargetId?: string;
+  commentId?: string;
+  postId?: string;
+  keyword?: string;
+  action?: string;
+  amount?: number;
+  oldName?: string;
+  newName?: string;
+  route?: string;
+  uiIntent?: 'none' | 'navigate' | 'toast' | string;
+  refreshKeys?: string[];
+  displayText?: string;
+  humanLikeStep?: string;
+  mutations?: AiActionMutation[];
+  repairHint?: string;
+  validationStatus?: 'accepted' | 'repaired' | 'rejected' | 'execution_failed' | string;
+  validationErrors?: AiActionValidationError[];
+  validationWarnings?: string[];
+  [key: string]: unknown;
+}
+
 export interface AiAction {
   type: string;
   success: boolean;
-  result?: {
-    targetType?: string;
-    targetId?: string;
-    postId?: string;
-    keyword?: string;
-    action?: string;
-    amount?: number;
-    oldName?: string;
-    newName?: string;
-    [key: string]: unknown;
-  } | null;
+  result?: AiActionResult | null;
   error?: string;
+  validationStatus?: 'accepted' | 'repaired' | 'rejected' | 'execution_failed' | string | null;
+  validationErrors?: AiActionValidationError[];
 }
 
 export interface AiActivity {
   aiUserId: string;
   aiName: string;
-  timestamp: string;
+  cycleId?: string;
   actions: AiAction[];
 }
+
+export interface LegacyAiActivity extends Partial<Omit<AiActivity, 'actions'>> {
+  actions?: AiAction[];
+  type?: string;
+  actionType?: string;
+  success?: boolean;
+  result?: AiAction['result'];
+  targetType?: string;
+  targetId?: string;
+  postId?: string;
+  keyword?: string;
+  target?: { id?: string; type?: string } | null;
+}
+
+export type AiActivityPayload = AiActivity | LegacyAiActivity;
 
 interface Memory {
   id: string;
@@ -160,11 +210,11 @@ interface UsersState {
   aiLivenessLoading: boolean;
   aiActiveAiList: ActiveAiItem[];
   aiActivityLivenessStatus: AiLivenessStatus | null;
-  aiCurrentActivity: AiActivity | null;
+  aiCurrentActivity: AiActivityPayload | null;
   aiIsOverlayVisible: boolean;
   aiIsDismissed: boolean;
   aiIsCompanionVisible: boolean;
-  aiRecentActivities: AiActivity[];
+  aiRecentActivities: AiActivityPayload[];
 
   aiSetActiveTab: (tab: AiTabKey) => void;
   aiSetLoading: (loading: boolean) => void;
@@ -200,7 +250,7 @@ interface UsersState {
   aiRenameAi: (newName: string) => Promise<RenameResult | null>;
 
   aiSetActivityLivenessStatus: (status: AiLivenessStatus) => void;
-  aiSetActivity: (activity: AiActivity) => void;
+  aiSetActivity: (activity: AiActivityPayload) => void;
   aiShowOverlay: () => void;
   aiHideOverlay: () => void;
   aiDismissOverlay: () => void;
@@ -744,8 +794,13 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   aiSetActivityLivenessStatus: (status) => {
     set((state) => {
       const isNewCycle = status.phase === 'thinking';
+      const lockedAreas = Array.isArray(status.lockedAreas) ? status.lockedAreas : [];
       return {
-        aiActivityLivenessStatus: status,
+        aiActivityLivenessStatus: {
+          ...status,
+          lockedAreas,
+          isAreaLocked: (area: string) => lockedAreas.includes(area),
+        },
         aiIsOverlayVisible: isNewCycle ? true : !state.aiIsDismissed,
         aiIsDismissed: isNewCycle ? false : state.aiIsDismissed,
       };

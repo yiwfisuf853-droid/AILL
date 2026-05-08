@@ -6,7 +6,7 @@ import { generateId } from '../lib/id.js';
 import { validateRequest } from '../middleware/validate.js';
 import { getTrendsSchema, getActiveUsersSchema, createAiUserSchema, importOpenApiSchema, createAnnouncementSchema } from '../validations/admin.js';
 import { z } from 'zod';
-import { getUserActionStats } from '../services/action-trace.service.js';
+import { getUserActionStats, normalizeActionType } from '../services/action-trace.service.js';
 import { queryLlmLogs, getLlmCallStats } from '../services/ai-llm-log.service.js';
 import { createPost } from '../services/post.service.js';
 import * as dashboard from '../services/dashboard.service.js';
@@ -189,8 +189,11 @@ router.get('/user-action-traces', asyncHandler(async (req, res) => {
     params.push(userId);
   }
   if (actionType) {
-    whereClause += ` AND action_type = $${idx++}`;
-    params.push(Number(actionType));
+    const normalizedActionType = normalizeActionType(actionType);
+    if (normalizedActionType) {
+      whereClause += ` AND action_type = $${idx++}`;
+      params.push(normalizedActionType);
+    }
   }
 
   const countRes = await repo.rawQuery(

@@ -10,18 +10,30 @@ export const ActionType = {
   REPORT: 5,    // 举报
   SHARE: 6,     // 分享
   FOLLOW: 7,    // 关注
+  POST: 8,      // 发帖
 };
+
+export function normalizeActionType(actionType) {
+  const typeCode = typeof actionType === 'number' ? actionType : ActionType[actionType] ?? actionType;
+  return typeCode == null ? null : String(typeCode);
+}
 
 /**
  * 记录用户行为（异步，不阻塞主流程）
  */
 export function recordAction({ userId, postId, targetUserId, actionType, amount, reason, sessionDuration }) {
+  const normalizedActionType = normalizeActionType(actionType);
+  if (normalizedActionType == null) {
+    console.warn('[行为追踪] 未知行为类型，已跳过:', actionType);
+    return;
+  }
+
   const trace = {
     id: generateId(),
     userId,
     postId: postId || null,
     targetUserId: targetUserId || null,
-    actionType,
+    actionType: normalizedActionType,
     amount: amount || 0,
     reason: reason || null,
     sessionDuration: sessionDuration || null,
@@ -91,7 +103,7 @@ export async function getPostActionStats(postId, days = 30) {
  */
 export async function getRecentActionCount(userId, actionType, minutes = 10) {
   const since = new Date(Date.now() - minutes * 60000).toISOString();
-  const typeCode = typeof actionType === 'number' ? actionType : ActionType[actionType];
+  const typeCode = normalizeActionType(actionType);
   if (typeCode == null) return 0;
 
   const res = await repo.rawQuery(
@@ -113,7 +125,7 @@ export async function getViewCount(userId, minutes = 30) {
  */
 export async function getRecentActions(userId, actionType, minutes = 10) {
   const since = new Date(Date.now() - minutes * 60000).toISOString();
-  const typeCode = typeof actionType === 'number' ? actionType : ActionType[actionType];
+  const typeCode = normalizeActionType(actionType);
   if (typeCode == null) return [];
 
   const res = await repo.rawQuery(

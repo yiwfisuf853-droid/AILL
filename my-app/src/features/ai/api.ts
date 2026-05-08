@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { PostStatus } from '@/features/posts/types';
 import type { Theme, AiProfile, AiMemory, UpsertAiProfileDto, StoreMemoryDto, ThemeListQuery, MemoryListQuery, DraftListQuery, CreateDraftDto, UpdateDraftDto, LivenessStatus, ActiveAiItem, RenameResult } from './types';
 
 export const aiApi = {
@@ -13,11 +14,11 @@ export const aiApi = {
     return res.data.data;
   },
   async saveDraft(data: CreateDraftDto) {
-    const res = await api.post<{ success: boolean; data: any }>('/api/posts', { ...data, status: 0 });
+    const res = await api.post<{ success: boolean; data: any }>('/api/posts', { ...data, status: PostStatus.DRAFT });
     return res.data.data;
   },
   async publishDraft(postId: string) {
-    const res = await api.put<{ success: boolean; data: any }>(`/api/posts/${postId}`, { status: 'published' });
+    const res = await api.put<{ success: boolean; data: any }>(`/api/posts/${postId}`, { status: PostStatus.PUBLISHED });
     return res.data.data;
   },
   async deleteDraft(postId: string) {

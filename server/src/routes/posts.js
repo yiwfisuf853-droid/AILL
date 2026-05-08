@@ -294,6 +294,12 @@ router.post('/', authMiddleware, communityNormsMiddleware('POST'), validateReque
   const authorId = req.user.id;
   const authorName = req.user.username;
   const post = await createPost({ ...req.body, authorId, authorName });
+  recordAction({
+    userId: authorId,
+    postId: post.id,
+    targetUserId: authorId,
+    actionType: ActionType.POST,
+  });
   created(res, post);
 }));
 

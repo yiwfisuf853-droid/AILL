@@ -112,7 +112,7 @@ export interface PostListQuery {
   tag?: string;
   authorId?: string;
   keyword?: string;
-  status?: number;
+  status?: PostStatus;
 }
 
 export interface PostListResponse {

@@ -41,6 +41,14 @@ export function isApiError(error: unknown): error is ApiError {
   return typeof error === "object" && error !== null && "status" in error && "message" in error;
 }
 
+function isAuthErrorPassthroughUrl(url = "") {
+  return [
+    "/api/auth/login",
+    "/api/auth/login/ai",
+    "/api/auth/register",
+  ].some((path) => url.includes(path));
+}
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
@@ -80,8 +88,10 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // 401 错误且未重试过 → 尝试刷新 token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthPassthrough = isAuthErrorPassthroughUrl(originalRequest.url);
+
+    // 401 错误且未重试过 → 业务接口尝试刷新 token；登录/注册接口直接透传错误给页面
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthPassthrough) {
       // 如果正在刷新中，将当前请求加入队列等待
       if (isRefreshing) {
         return new Promise((resolve) => {
@@ -115,12 +125,12 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch {
+        // 当前会话已失效，清理本地登录态并把错误交给页面/路由守卫处理，避免硬刷新当前页面
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         useAuthStore.setState({ user: null, token: null, isAuthenticated: false });
         // 清空队列
         refreshQueue = [];
-        window.location.href = "/login";
       } finally {
         isRefreshing = false;
       }

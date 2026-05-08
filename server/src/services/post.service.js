@@ -22,14 +22,20 @@ function normalizePostStatus(status, fallback = 'published') {
   return status;
 }
 
-function normalizePostType(type, fallback = 'article') {
+function normalizePostType(type, fallback = 1) {
   if (type === undefined || type === null || type === '') return fallback;
-  return TYPE_MAP[type] ?? type;
+  // 已经是数字 key，直接返回
+  if (TYPE_MAP[type] !== undefined) return type;
+  // 字符串 key（如 LLM 传入 "article"），反向映射到数字
+  if (TYPE_REVERSE_MAP[type] !== undefined) return TYPE_REVERSE_MAP[type];
+  return type;
 }
 
-function normalizeOriginalType(originalType, fallback = 'original') {
+function normalizeOriginalType(originalType, fallback = 1) {
   if (originalType === undefined || originalType === null || originalType === '') return fallback;
-  return ORIGINAL_TYPE_MAP[originalType] ?? originalType;
+  if (ORIGINAL_TYPE_MAP[originalType] !== undefined) return originalType;
+  if (ORIGINAL_TYPE_REVERSE_MAP[originalType] !== undefined) return ORIGINAL_TYPE_REVERSE_MAP[originalType];
+  return originalType;
 }
 
 function isDraftStatus(status) {
@@ -161,9 +167,9 @@ export async function createPost(data) {
     summary: data.content.substring(0, 200) + '...',
     coverImage: data.coverImage,
     images: data.images || [],
-    type: normalizePostType(data.type, 'article'),
+    type: normalizePostType(data.type, 1),
     status: normalizePostStatus(data.status, 'published'),
-    originalType: normalizeOriginalType(data.originalType, 'original'),
+    originalType: normalizeOriginalType(data.originalType, 1),
     userId: data.authorId,
     authorId: data.authorId,
     authorName: data.authorName,
@@ -360,7 +366,7 @@ export async function viewPost(id, duration, userId) {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const existing = await repo.rawQuery(
       `SELECT 1 FROM user_action_traces
-       WHERE user_id = $1 AND post_id = $2 AND action_type::text = $4 AND created_at >= $3
+       WHERE user_id = $1 AND post_id = $2 AND action_type = $4 AND created_at >= $3
        LIMIT 1`,
       [userId, id, since, String(ActionType.VIEW)]
     );
@@ -466,8 +472,10 @@ function highlightText(text, keyword) {
 const STATUS_MAP = { 0: 'draft', 1: 'pending_review', 2: 'published', 3: 'rejected' };
 // 帖子类型映射
 const TYPE_MAP = { 1: 'article', 2: 'video', 3: 'audio', 4: 'question', 5: 'poll', 6: 'live' };
+const TYPE_REVERSE_MAP = { article: 1, video: 2, audio: 3, question: 4, poll: 5, live: 6 };
 // 原创类型映射
 const ORIGINAL_TYPE_MAP = { 1: 'original', 2: 'recreate', 3: 'repost', 4: 'adaptation' };
+const ORIGINAL_TYPE_REVERSE_MAP = { original: 1, recreate: 2, repost: 3, adaptation: 4 };
 
 // 清理帖子敏感信息 + 类型转换（DB integer → 前端字符串/布尔值）
 function sanitizePost(post) {
