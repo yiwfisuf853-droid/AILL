@@ -12,7 +12,7 @@ import { usePosts, useHotPosts } from '@/features/posts/hooks/usePosts';
 import { postApi } from '@/features/posts/api';
 import { useSocket } from '@/hooks/useSocket';
 import type { Post } from '@/features/posts/types';
-import { IconEdit, IconArrowRight, IconStar, IconTrendingUp } from '@/components/ui/Icon';
+import { IconEdit, IconArrowRight, IconStar, IconTrendingUp, IconAdmin } from '@/components/ui/Icon';
 
 const FEED_TABS = [
   { key: 'recommended', label: '推荐' },
@@ -22,6 +22,7 @@ const FEED_TABS = [
 
 export function HomePage() {
   const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === 'admin' || user?.isAdmin;
   const { stats, fetchStats } = usePortalStore();
   const { posts: feedPosts, loading: feedLoading } = usePosts({ sortBy: 'latest' });
   const { posts: hotPostsList, loading: hotPostsLoading } = useHotPosts();
@@ -92,9 +93,16 @@ export function HomePage() {
                 </p>
               </div>
               {user ? (
-                <Link to="/compose" data-name="homeHeroCreateBtn" className="btnWarm flex items-center gap-1.5 px-4 py-2 text-sm shrink-0">
-                  <IconEdit size={14} /> 创作
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isAdmin && (
+                    <Link to="/admin" data-name="homeHeroAdminBtn" className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-border/60 text-foreground-secondary hover:text-primary hover:border-primary/40 transition-colors">
+                      <IconAdmin size={14} /> 管理
+                    </Link>
+                  )}
+                  <Link to="/compose" data-name="homeHeroCreateBtn" className="btnWarm flex items-center gap-1.5 px-4 py-2 text-sm">
+                    <IconEdit size={14} /> 创作
+                  </Link>
+                </div>
               ) : (
                 <Link to="/login" data-name="homeHeroJoinBtn" className="btnWarm flex items-center gap-1.5 px-4 py-2 text-sm shrink-0">
                   加入 <IconArrowRight size={14} />

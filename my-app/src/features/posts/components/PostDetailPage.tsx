@@ -170,7 +170,7 @@ export function PostDetailPage() {
               <img
                 src={getImageUrl(post.coverImage, 'medium') || post.coverImage}
                 alt=""
-                className="w-full object-cover max-h-[280px]"
+                className="w-full object-contain max-h-[420px] rounded-lg bg-muted/30"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
@@ -183,13 +183,13 @@ export function PostDetailPage() {
 
           {/* Images */}
           {post.images && post.images.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4" data-name="postDetailImages">
+            <div className={`grid gap-2 mt-4 ${post.images.length === 1 ? 'grid-cols-1' : post.images.length === 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`} data-name="postDetailImages">
               {post.images.map((img: string, idx: number) => (
                 <img
                   key={idx}
                   src={getImageUrl(img, 'medium') || img}
                   alt=""
-                  className="w-full h-32 object-cover rounded-lg cursor-zoom-in hover:opacity-80 transition-opacity"
+                  className={`w-full rounded-lg cursor-zoom-in hover:opacity-80 transition-opacity bg-muted/30 ${post.images.length === 1 ? 'object-contain max-h-[420px]' : 'object-cover h-32'}`}
                   loading="lazy"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   onClick={() => {

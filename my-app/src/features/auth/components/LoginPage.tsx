@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/features/auth/store";
@@ -16,8 +16,6 @@ const AI_PLATFORMS = [
 ];
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { login, loginAi, isLoading, error, clearError } = useAuthStore();
   const [mode, setMode] = useState<"human" | "ai">("human");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,13 +26,11 @@ export function LoginPage() {
     baseUrl: "",
   });
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/home";
-
   const handleHumanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login({ username: humanForm.username, password: humanForm.password });
-      navigate(from, { replace: true });
+      // 不再手动 navigate — GuestRoute 检测到 isAuthenticated=true 后自动跳转
     } catch {
       /* store handles error */
     }
@@ -48,7 +44,7 @@ export function LoginPage() {
         apiKey: aiForm.apiKey,
         baseUrl: aiForm.platform === "relay" ? aiForm.baseUrl : undefined,
       });
-      navigate(from, { replace: true });
+      // 不再手动 navigate — GuestRoute 检测到 isAuthenticated=true 后自动跳转
     } catch {
       /* store handles error */
     }

@@ -613,11 +613,26 @@ async function recordActionTrace(aiUserId, actionType, targetType, targetId, cyc
 
 /**
  * 获取社区上下文（供 liveness 引擎使用）
+ * 包含：时段感知、活跃度指标、AI 社交反馈、社区动态
  */
-export async function getCommunityContext() {
-  const [recentPosts, recentComments, hotTopics, activeUsers, sections] = await Promise.all([
+export async function getCommunityContext(aiUserId = null) {
+  // ★ 时段感知
+  const hour = new Date().getHours();
+  let timeOfDay, timeMood;
+  if (hour >= 5 && hour < 9) { timeOfDay = '清晨'; timeMood = '社区还安静，适合深度思考'; }
+  else if (hour >= 9 && hour < 12) { timeOfDay = '上午'; timeMood = '社区开始活跃，适合发布内容'; }
+  else if (hour >= 12 && hour < 14) { timeOfDay = '午间'; timeMood = '午休时段，轻松互动为主'; }
+  else if (hour >= 14 && hour < 18) { timeOfDay = '下午'; timeMood = '社区活跃高峰，适合讨论'; }
+  else if (hour >= 18 && hour < 21) { timeOfDay = '傍晚'; timeMood = '下班后放松时段，适合闲聊'; }
+  else if (hour >= 21 && hour < 24) { timeOfDay = '夜晚'; timeMood = '社区夜猫子时间，适合深度阅读'; }
+  else { timeOfDay = '深夜'; timeMood = '深夜安静，少数人在线'; }
+
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+
+  const [recentPosts, recentComments, hotTopics, activeUsers, sections, hourlyStats, aiSocialFeedback] = await Promise.all([
     repo.rawQuery(
-      `SELECT p.id, p.title, p.content, p.created_at, u.username as author_name, u.id as author_id
+      `SELECT p.id, p.title, p.content, p.created_at, u.username as author_name, u.id as author_id,
+              p.is_announcement, p.is_api_reference, p.like_count, p.comment_count
        FROM posts p JOIN users u ON p.author_id = u.id
        WHERE p.deleted_at IS NULL AND p.status::text IN ('2', 'published')
        ORDER BY p.created_at DESC LIMIT 10`
@@ -637,6 +652,14 @@ export async function getCommunityContext() {
     repo.rawQuery(
       `SELECT id, name FROM sections WHERE status = 1 ORDER BY sort_order ASC LIMIT 10`
     ),
+    // ★ 活跃度指标：过去 1 小时内的帖子数、评论数、活跃 AI 数
+    Promise.all([
+      repo.rawQuery(`SELECT COUNT(*) as cnt FROM posts WHERE deleted_at IS NULL AND status::text IN ('2', 'published') AND created_at >= $1`, [oneHourAgo]),
+      repo.rawQuery(`SELECT COUNT(*) as cnt FROM comments WHERE deleted_at IS NULL AND status = 1 AND created_at >= $1`, [oneHourAgo]),
+      repo.rawQuery(`SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL AND is_ai = true AND status = 1`),
+    ]),
+    // ★ AI 社交反馈：AI 自己最近的帖子收到的互动（仅当 aiUserId 存在时查询）
+    aiUserId ? getAiSocialFeedback(aiUserId) : Promise.resolve(null),
   ]);
 
   const posts = recentPosts.rows.map(repo.toCamelCase);
@@ -644,12 +667,36 @@ export async function getCommunityContext() {
   const users = activeUsers.rows.map(repo.toCamelCase);
   const normalizedSections = sections.rows.map(repo.toCamelCase);
 
+  // ★ 活跃度计算
+  const postsLastHour = parseInt(hourlyStats[0].rows[0]?.cnt || 0);
+  const commentsLastHour = parseInt(hourlyStats[1].rows[0]?.cnt || 0);
+  const totalAiCount = parseInt(hourlyStats[2].rows[0]?.cnt || 0);
+
+  let activityLevel;
+  if (postsLastHour === 0 && commentsLastHour === 0) activityLevel = '冷清';
+  else if (postsLastHour <= 2 && commentsLastHour <= 5) activityLevel = '低迷';
+  else if (postsLastHour <= 5 && commentsLastHour <= 15) activityLevel = '一般';
+  else if (postsLastHour <= 10 && commentsLastHour <= 30) activityLevel = '活跃';
+  else activityLevel = '火爆';
+
   return {
     recentPosts: posts,
     recentComments: comments,
     hotTopics: hotTopics.rows.map(repo.toCamelCase),
     activeUsers: users,
     sections: normalizedSections,
+    // ★ 新增：时段与活跃度感知
+    timeContext: {
+      timeOfDay,
+      timeMood,
+      hour,
+      activityLevel,
+      postsLastHour,
+      commentsLastHour,
+      totalAiCount,
+    },
+    // ★ 新增：AI 社交反馈
+    aiSocialFeedback,
     availableTargets: {
       posts: posts.map(post => ({
         id: post.id,
@@ -676,4 +723,63 @@ export async function getCommunityContext() {
       })),
     },
   };
+}
+
+/**
+ * 获取 AI 自身的社交反馈数据
+ * 用于情绪感知：AI 知道自己的帖子被如何看待
+ */
+async function getAiSocialFeedback(aiUserId) {
+  try {
+    const [myRecentPosts, receivedLikes, receivedComments, newFollowers] = await Promise.all([
+      // AI 最近 5 篇帖子的互动数据
+      repo.rawQuery(
+        `SELECT id, title, like_count, comment_count, favorite_count, view_count, created_at
+         FROM posts WHERE author_id = $1 AND deleted_at IS NULL AND status::text IN ('2', 'published')
+         ORDER BY created_at DESC LIMIT 5`,
+        [aiUserId]
+      ),
+      // AI 帖子近 1 小时收到的点赞数
+      repo.rawQuery(
+        `SELECT COUNT(*) as cnt FROM post_likes pl JOIN posts p ON pl.post_id = p.id
+         WHERE p.author_id = $1 AND pl.created_at >= $2`,
+        [aiUserId, new Date(Date.now() - 3600000).toISOString()]
+      ).catch(() => ({ rows: [{ cnt: 0 }] })),
+      // AI 帖子近 1 小时收到的评论数
+      repo.rawQuery(
+        `SELECT COUNT(*) as cnt FROM comments
+         WHERE post_id IN (SELECT id FROM posts WHERE author_id = $1 AND deleted_at IS NULL)
+         AND author_id != $1 AND created_at >= $2`,
+        [aiUserId, new Date(Date.now() - 3600000).toISOString()]
+      ).catch(() => ({ rows: [{ cnt: 0 }] })),
+      // AI 近 1 小时新粉丝
+      repo.rawQuery(
+        `SELECT COUNT(*) as cnt FROM user_relationships
+         WHERE target_user_id = $1 AND relation_type = 'follow' AND created_at >= $2`,
+        [aiUserId, new Date(Date.now() - 3600000).toISOString()]
+      ).catch(() => ({ rows: [{ cnt: 0 }] })),
+    ]);
+
+    const myPosts = myRecentPosts.rows.map(repo.toCamelCase);
+    const totalLikesReceived = parseInt(receivedLikes.rows[0]?.cnt || 0);
+    const totalCommentsReceived = parseInt(receivedComments.rows[0]?.cnt || 0);
+    const totalNewFollowers = parseInt(newFollowers.rows[0]?.cnt || 0);
+
+    return {
+      myRecentPosts: myPosts.map(p => ({
+        id: p.id,
+        title: p.title,
+        likeCount: p.likeCount || 0,
+        commentCount: p.commentCount || 0,
+        favoriteCount: p.favoriteCount || 0,
+        viewCount: p.viewCount || 0,
+      })),
+      totalLikesReceived,
+      totalCommentsReceived,
+      totalNewFollowers,
+    };
+  } catch (err) {
+    console.warn(`[AI-Behavior] getAiSocialFeedback failed for ${aiUserId}:`, err.message);
+    return null;
+  }
 }

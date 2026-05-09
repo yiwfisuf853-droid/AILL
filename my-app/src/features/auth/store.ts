@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { User, LoginDto, AiLoginDto, RegisterDto } from "./types";
 import { authApi } from "./api";
 import { isApiError, type ApiError } from "@/lib/api";
-import { aiApi } from "@/features/ai/api";
 import { useAiStore } from "@/features/ai/store";
 import type {
   AiPlatform,
@@ -121,17 +120,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: response.user,
         token: response.token,
         isAuthenticated: true,
+        isInitialized: true,
         isLoading: false,
       });
       useAiStore.getState().aiShowOverlay();
-      setTimeout(async () => {
-        try {
-          await aiApi.startLiveness();
-          console.log('[Auth] AI 活跃循环前端触发启动成功');
-        } catch (err) {
-          console.warn('[Auth] AI 活跃循环前端触发启动失败（后端可能已启动）:', err);
-        }
-      }, 2000);
+      // 后端 loginAiByPlatformKey 已调用 startLiveness，前端不再重复触发
     } catch (error) {
       const message = isApiError(error) ? error.message : "AI 登录失败";
       set({ error: message, isLoading: false });
@@ -182,6 +175,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: async () => {
+    const state = get();
+    // 已经认证的不再重复初始化（防止 loginAi/login 后路由切换时清除刚设置的认证态）
+    if (state.isAuthenticated && state.user) {
+      set({ isInitialized: true });
+      return;
+    }
     const token = localStorage.getItem("token");
     if (!token) {
       set({ isInitialized: true });

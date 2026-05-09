@@ -115,7 +115,7 @@ export const PostCard = memo(function PostCard({ post, variant = 'default' }: Po
                 alt=""
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                onError={(e) => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
           )}

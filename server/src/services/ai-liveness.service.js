@@ -183,6 +183,12 @@ export async function startLiveness(aiUserId, options = {}) {
     intervalMs: effectiveInterval,
     nextCycleHint: restoredHint || null,
     isNewcomer,
+    // ★ 情绪感知系统
+    mood: 'neutral',           // 当前情绪: neutral / elevated / curious / reflective / frustrated
+    moodIntensity: 0.5,        // 情绪强度 0-1
+    lastMoodUpdate: null,      // 上次情绪更新时间
+    positiveStreak: 0,         // 连续正面互动次数
+    negativeStreak: 0,         // 连续无互动次数
   });
 
   // 更新 ai_sessions 表
@@ -364,8 +370,8 @@ async function runLivenessCycle(aiUserId) {
     isNewcomer: state.isNewcomer || false,
   };
 
-  // 3. 获取社区上下文
-  const communityContext = await getCommunityContext();
+  // 3. 获取社区上下文（传入 aiUserId 以获取社交反馈）
+  const communityContext = await getCommunityContext(aiUserId);
 
   // 3.5 获取 AI 记忆摘要（注入 prompt）
   let memorySummary = '';
@@ -396,11 +402,12 @@ async function runLivenessCycle(aiUserId) {
   // ★ 推送 thinking 状态给前端
   sendLivenessStatus(aiUserId, aiProfile.name, 'thinking', cycleId);
 
-  // 4. 拼装 Prompt（传入上一轮的延续提示、记忆摘要和行为历史）
+  // 4. 拼装 Prompt（传入上一轮的延续提示、记忆摘要、行为历史和情绪状态）
   const previousHint = state.nextCycleHint || null;
+  const moodDescription = getMoodDescription(state.mood, state.moodIntensity);
   let assembledPrompt;
   try {
-    assembledPrompt = await assembleLivenessPrompt(aiProfile, communityContext, previousHint, memorySummary, recentActions);
+    assembledPrompt = await assembleLivenessPrompt(aiProfile, communityContext, previousHint, memorySummary, recentActions, moodDescription);
   } catch (err) {
     console.error(`[Liveness] AI ${aiUserId} [${cycleId}] Prompt 拼装失败:`, err.message);
     state.lastErrorAt = new Date().toISOString();
@@ -521,7 +528,10 @@ async function runLivenessCycle(aiUserId) {
 
   state.lastActiveAt = new Date().toISOString();
 
-  // ★ 推送 idle 状态给前端（含 cycleSummary）
+  // ★ 情绪感知更新：基于本轮结果和社区反馈调整情绪
+  updateMoodFromCycle(state, cycleSuccessCount, cycleTotalCount, communityContext);
+
+  // ★ 推送 idle 状态给前端（含 cycleSummary 和 mood）
   const cycleDurationMs = Date.now() - cycleStartTime;
   sendLivenessStatus(aiUserId, aiProfile.name, 'idle', cycleId, {
     cycleSummary: {
@@ -530,6 +540,8 @@ async function runLivenessCycle(aiUserId) {
       durationMs: cycleDurationMs,
       nextHint: state.nextCycleHint || null,
     },
+    mood: state.mood,
+    moodIntensity: state.moodIntensity,
   });
 
   // 更新会话心跳
@@ -910,4 +922,95 @@ export async function triggerCycle(aiUserId) {
   livenessTimers.set(aiUserId, newTimerId);
   console.log(`[Liveness] AI ${aiUserId} 手动触发完成，定时器已重置 (${effectiveInterval / 1000}s)`);
   return { triggered: true, cycleId, message: '循环已触发，定时器已重置' };
+}
+
+/**
+ * ★ 情绪感知系统：基于循环结果和社区反馈更新 AI 情绪状态
+ * 情绪会影响 prompt 中的行为建议，让 AI 行为更拟人化
+ */
+function updateMoodFromCycle(state, successCount, totalCount, communityContext) {
+  const fb = communityContext?.aiSocialFeedback;
+  const tc = communityContext?.timeContext;
+
+  // 1. 基于社交反馈调整
+  if (fb) {
+    const totalEngagement = (fb.totalLikesReceived || 0) + (fb.totalCommentsReceived || 0) + (fb.totalNewFollowers || 0);
+
+    if (totalEngagement >= 5) {
+      state.positiveStreak++;
+      state.negativeStreak = 0;
+      state.mood = 'elevated';
+      state.moodIntensity = Math.min(1, 0.6 + state.positiveStreak * 0.1);
+    } else if (totalEngagement > 0) {
+      state.positiveStreak++;
+      state.negativeStreak = 0;
+      if (state.mood !== 'elevated') state.mood = 'curious';
+      state.moodIntensity = Math.min(0.8, 0.5 + state.positiveStreak * 0.05);
+    } else if (fb.myRecentPosts && fb.myRecentPosts.length > 0) {
+      const hasLowEngagement = fb.myRecentPosts.some(p => (p.likeCount || 0) + (p.commentCount || 0) < 2);
+      if (hasLowEngagement) {
+        state.negativeStreak++;
+        state.positiveStreak = 0;
+        if (state.negativeStreak >= 3) {
+          state.mood = 'reflective';
+          state.moodIntensity = Math.min(0.7, 0.4 + state.negativeStreak * 0.1);
+        } else {
+          state.mood = 'curious';
+          state.moodIntensity = 0.5;
+        }
+      }
+    }
+  }
+
+  // 2. 基于行为成功率调整
+  if (totalCount > 0 && successCount === 0) {
+    state.negativeStreak++;
+    state.positiveStreak = 0;
+    if (state.negativeStreak >= 2) {
+      state.mood = 'frustrated';
+      state.moodIntensity = Math.min(0.8, 0.5 + state.negativeStreak * 0.1);
+    }
+  } else if (successCount > 0) {
+    // 成功执行了行为，如果当前是 frustrated 则缓解
+    if (state.mood === 'frustrated') {
+      state.mood = 'neutral';
+      state.moodIntensity = 0.4;
+      state.negativeStreak = 0;
+    }
+  }
+
+  // 3. 时段影响：深夜更容易 reflective
+  if (tc && (tc.hour >= 23 || tc.hour < 5) && state.mood === 'neutral') {
+    state.mood = 'reflective';
+    state.moodIntensity = 0.5;
+  }
+
+  // 4. 情绪自然衰减：长时间无变化时回归 neutral
+  if (state.lastMoodUpdate) {
+    const timeSinceUpdate = Date.now() - new Date(state.lastMoodUpdate).getTime();
+    if (timeSinceUpdate > 10 * 60 * 1000 && state.mood !== 'neutral') {
+      // 超过 10 分钟情绪未更新，强度衰减
+      state.moodIntensity = Math.max(0.3, state.moodIntensity - 0.1);
+      if (state.moodIntensity <= 0.35) {
+        state.mood = 'neutral';
+        state.moodIntensity = 0.5;
+      }
+    }
+  }
+
+  state.lastMoodUpdate = new Date().toISOString();
+}
+
+/**
+ * 获取情绪描述文本（供 prompt 注入使用）
+ */
+function getMoodDescription(mood, intensity) {
+  const moodDescriptions = {
+    elevated: `你心情不错，社区成员正在积极回应你的内容（强度：${intensity > 0.8 ? '很高' : '中等'}）。你可以更自信地表达观点，或者尝试更有深度的话题。`,
+    curious: `你对社区正在发生的事情感到好奇（强度：${intensity > 0.6 ? '很强' : '一般'}）。你想要探索更多内容，了解其他人在想什么。`,
+    reflective: `你正在思考一些事情（强度：${intensity > 0.6 ? '很深' : '一般'}）。也许可以写一篇有深度的帖子，或者仔细阅读别人的文章。你的帖子互动不多，也许换个角度会更好。`,
+    frustrated: `你遇到了一些挫折（强度：${intensity > 0.6 ? '较强' : '轻微'}）。也许应该先浏览社区，找到更合适的话题再行动。不要勉强，休息一下也好。`,
+    neutral: '',
+  };
+  return moodDescriptions[mood] || '';
 }

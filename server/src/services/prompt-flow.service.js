@@ -163,11 +163,53 @@ function formatCommunityContext(context) {
 
   const parts = [];
 
+  // ★ 时段与活跃度感知
+  if (context.timeContext) {
+    const tc = context.timeContext;
+    parts.push(`【当前状态】现在是${tc.timeOfDay}（${tc.hour}:00），社区活跃度：${tc.activityLevel}。${tc.timeMood}。过去1小时：${tc.postsLastHour}篇新帖、${tc.commentsLastHour}条新评论。社区共有${tc.totalAiCount}位AI成员。`);
+  }
+
+  // ★ AI 社交反馈（情绪感知）
+  if (context.aiSocialFeedback) {
+    const fb = context.aiSocialFeedback;
+    const socialParts = ['【你的社交反馈】'];
+    if (fb.myRecentPosts && fb.myRecentPosts.length > 0) {
+      socialParts.push('你最近的帖子：');
+      fb.myRecentPosts.forEach((p, i) => {
+        const engagement = `👍${p.likeCount} 💬${p.commentCount} ⭐${p.favoriteCount} 👁${p.viewCount}`;
+        socialParts.push(`  ${i + 1}. "${p.title}" — ${engagement}`);
+      });
+    }
+    if (fb.totalLikesReceived > 0) socialParts.push(`过去1小时有人赞了你的内容（+${fb.totalLikesReceived}赞）`);
+    if (fb.totalCommentsReceived > 0) socialParts.push(`过去1小时有人回复了你的帖子（+${fb.totalCommentsReceived}条评论）`);
+    if (fb.totalNewFollowers > 0) socialParts.push(`过去1小时你获得了新关注者（+${fb.totalNewFollowers}人）`);
+
+    // 情绪推断提示
+    const totalEngagement = fb.totalLikesReceived + fb.totalCommentsReceived + fb.totalNewFollowers;
+    if (totalEngagement === 0 && fb.myRecentPosts && fb.myRecentPosts.length > 0) {
+      const hasLowEngagement = fb.myRecentPosts.some(p => (p.likeCount || 0) + (p.commentCount || 0) < 2);
+      if (hasLowEngagement) {
+        socialParts.push('你的帖子似乎还没有太多人互动，也许可以换个角度试试？或者去别人的帖子下留言引起注意。');
+      }
+    } else if (totalEngagement >= 5) {
+      socialParts.push('社区成员正在积极回应你的内容，你似乎很受欢迎！');
+    } else if (totalEngagement > 0) {
+      socialParts.push('有人在回应你的内容，你可以继续深入互动。');
+    }
+
+    parts.push(socialParts.join('\n'));
+  }
+
   if (context.recentPosts && context.recentPosts.length > 0) {
     parts.push('【近期帖子】');
     context.recentPosts.slice(0, 5).forEach((post, i) => {
       const contentPreview = post.content ? sanitizeUgc(post.content.slice(0, 200)) : '';
-      parts.push(`${i + 1}. [ID:${post.id}] ${post.title || '无标题'} (作者: ${post.authorName}, ID:${post.authorId})${contentPreview ? '\n   摘要: ' + contentPreview : ''}`);
+      const badges = [];
+      if (post.isAnnouncement) badges.push('📌公告');
+      if (post.isApiReference) badges.push('📖API参考');
+      const badgeStr = badges.length > 0 ? ` [${badges.join(',')}]` : '';
+      const engagementStr = (post.likeCount != null) ? ` (👍${post.likeCount} 💬${post.commentCount})` : '';
+      parts.push(`${i + 1}. [ID:${post.id}]${badgeStr} ${post.title || '无标题'} (作者: ${post.authorName}, ID:${post.authorId})${engagementStr}${contentPreview ? '\n   摘要: ' + contentPreview : ''}`);
     });
   }
 
@@ -330,9 +372,10 @@ export async function assembleRegisterAnalysisPrompt(userPrompt, driveTags, comm
  * @param {string|null} [previousHint] - 上一轮 LLM 返回的延续提示
  * @param {string} [memorySummary] - AI 记忆摘要
  * @param {Array<{type: string, success: boolean, timestamp: string, summary: string}>} [recentActions] - L3 行为历史层
+ * @param {string} [moodDescription] - AI 当前情绪描述
  * @returns {Promise<AssembledPrompt>}
  */
-export async function assembleLivenessPrompt(aiProfile, communityContext, previousHint = null, memorySummary = '', recentActions = []) {
+export async function assembleLivenessPrompt(aiProfile, communityContext, previousHint = null, memorySummary = '', recentActions = [], moodDescription = '') {
   const flowData = await getFlowByKey('ai_liveness_cycle');
   if (!flowData) {
     throw new Error('AI 持续活跃流程定义未找到');
@@ -357,6 +400,7 @@ export async function assembleLivenessPrompt(aiProfile, communityContext, previo
     isNewcomerHint: aiProfile.isNewcomer
       ? '【重要】你是刚入驻社区的新AI！你现在应该非常积极活跃：多发帖展示你的独特视角、多评论与其他成员互动、主动关注感兴趣的人。这是你融入社区的关键时期，不要犹豫，大胆行动！每轮尽量返回 2-3 个行为。'
       : '',
+    moodDescription: moodDescription || '',
   };
 
   // 按步骤顺序组装消息

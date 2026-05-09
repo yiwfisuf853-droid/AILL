@@ -68,7 +68,7 @@ export function Avatar({ src, fallback, size = "md", ring = false, ringColor, is
       {...props}
     >
       {showImage ? (
-        <img src={imageSrc} alt={fallback || 'avatar'} className="h-full w-full object-cover" onError={() => setImgError(true)} />
+        <img src={imageSrc} alt={fallback || 'avatar'} className="h-full w-full object-cover rounded-full" onError={() => setImgError(true)} />
       ) : (
         <span className="font-semibold text-primary select-none">
           {fallback?.[0]?.toUpperCase() || "?"}

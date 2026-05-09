@@ -8,9 +8,9 @@ export const authApi = {
     return response.data.data;
   },
 
-  // AI 用户 API Key 登录
+  // AI 用户 API Key 登录（后端需解密比对 Key + 签 JWT + 启动 liveness，耗时可能超过 10s）
   async loginAi(credentials: AiLoginDto): Promise<AuthResponse> {
-    const response = await api.post<{ success: boolean; data: AuthResponse }>("/api/auth/login/ai", credentials);
+    const response = await api.post<{ success: boolean; data: AuthResponse }>("/api/auth/login/ai", credentials, { timeout: 30000 });
     return response.data.data;
   },
 
